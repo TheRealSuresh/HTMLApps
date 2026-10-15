@@ -1,0 +1,740 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>[hidden]{display:none!important}body{margin:0}</style>
+</head>
+<body>
+<title>Erosion Calculator</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+<style>
+/* Layout: a two-pane workbench. Inputs on the left, the verdict pinned on the right, the full ranking as a ribbon underneath. */
+:root {
+  --bg: #f4f5f3;
+  --panel: #ffffff;
+  --ink: #18201f;
+  --muted: #5d6865;
+  --line: #d9ddd9;
+  --soft: #eceeeb;
+  --accent: #1f5f5b;
+  --accent-ink: #ffffff;
+  --succeeds: #2f7d5b;
+  --muddles: #8a8a6e;
+  --risk: #c27a12;
+  --erodes: #b23a2b;
+  --zone-succeeds: #dcebe2;
+  --zone-muddles: #e9e9de;
+  --zone-risk: #f5e4c6;
+  --zone-erodes: #f2d6d1;
+  --focus: #2f6fd1;
+  --display: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --body: "IBM Plex Sans", -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  --r: 6px;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #121615; --panel: #1a201f; --ink: #e6ebe9; --muted: #9aa7a3; --line: #2e3836; --soft: #232b29;
+  --accent: #6fb8b1; --accent-ink: #0d1514; --succeeds: #6cc49a; --muddles: #b4b495; --risk: #e8a74a; --erodes: #ef7f6f;
+  --zone-succeeds: #1d3329; --zone-muddles: #2b2c24; --zone-risk: #3a2e19; --zone-erodes: #3d221e; --focus: #7aa7ff; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #121615; --panel: #1a201f; --ink: #e6ebe9; --muted: #9aa7a3; --line: #2e3836; --soft: #232b29;
+  --accent: #6fb8b1; --accent-ink: #0d1514; --succeeds: #6cc49a; --muddles: #b4b495; --risk: #e8a74a; --erodes: #ef7f6f;
+  --zone-succeeds: #1d3329; --zone-muddles: #2b2c24; --zone-risk: #3a2e19; --zone-erodes: #3d221e; --focus: #7aa7ff; color-scheme: dark; }
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.45; }
+.wrap { max-width: 78rem; margin: 0 auto; padding-block: 24px 48px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 20px; }
+h1, h2, h3 { text-wrap: balance; margin: 0; }
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.eyebrow { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.muted { color: var(--muted); }
+
+/* header */
+.top { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 24px; border-bottom: 1px solid var(--line); padding-bottom: 16px; }
+.top h1 { font-family: var(--display); font-weight: 600; font-size: 30px; letter-spacing: -.01em; }
+.top p { margin: 4px 0 0; color: var(--muted); max-width: 62ch; }
+.status { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+.status i { width: 7px; height: 7px; border-radius: 50%; background: var(--muddles); display: inline-block; }
+.status.ok i { background: var(--succeeds); }
+.status.warn i { background: var(--risk); }
+
+/* country bar */
+.bar { display: flex; flex-wrap: wrap; gap: 10px 12px; align-items: end; }
+.field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.field label { font-size: 12px; color: var(--muted); font-weight: 500; }
+.field input[type=text], .field select, .num-in { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 7px 10px; min-width: 0; }
+.field select { min-width: 13rem; }
+.btn { border: 1px solid var(--line); background: var(--panel); border-radius: var(--r); padding: 7px 12px; cursor: pointer; font-weight: 500; }
+.btn:hover { border-color: var(--muted); }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn.primary:disabled { opacity: .45; cursor: default; }
+.btn.ghost { background: transparent; }
+.btn.danger { color: var(--erodes); }
+.dirty { font-size: 12px; color: var(--risk); font-weight: 500; }
+
+/* main grid */
+.main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 24rem); gap: 20px; align-items: start; }
+@media (max-width: 900px) { .main { grid-template-columns: minmax(0, 1fr); } .verdict { position: static !important; order: -1; } }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 18px; min-width: 0; }
+
+/* mode tabs */
+.tabs { display: inline-flex; border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; background: var(--panel); }
+.tabs button { border: 0; background: transparent; padding: 7px 14px; cursor: pointer; font-weight: 500; color: var(--muted); }
+.tabs button[aria-selected="true"] { background: var(--ink); color: var(--bg); }
+.inputs { display: flex; flex-direction: column; gap: 16px; }
+.inputs-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; }
+.inputs-head p { margin: 0; font-size: 13px; color: var(--muted); max-width: 52ch; }
+
+/* score sliders */
+.tier { display: flex; flex-direction: column; gap: 2px; }
+.tier-h { display: flex; justify-content: space-between; align-items: baseline; padding: 8px 0 6px; border-bottom: 1px solid var(--line); margin-bottom: 4px; }
+.tier-h h3 { font-size: 13px; font-weight: 600; }
+.srow { display: grid; grid-template-columns: minmax(0, 1fr) minmax(7rem, 13rem) 2.6rem; gap: 12px; align-items: center; padding: 5px 0; }
+.srow .lbl { font-size: 14px; min-width: 0; }
+.srow .lbl small { display: block; color: var(--muted); font-size: 12px; }
+.srow .val { text-align: right; font-weight: 500; }
+.srow.derived .val { color: var(--accent); }
+.srow.changed .lbl::after { content: " • edited"; color: var(--risk); font-size: 12px; }
+input[type=range] { width: 100%; accent-color: var(--accent); }
+@media (max-width: 520px) { .srow { grid-template-columns: minmax(0, 1fr) 2.6rem; } .srow input[type=range] { grid-column: 1 / -1; grid-row: 2; } }
+
+/* figures */
+.fig-group { border: 1px solid var(--line); border-radius: var(--r); }
+.fig-group summary { cursor: pointer; padding: 10px 12px; display: flex; justify-content: space-between; gap: 10px; align-items: center; list-style: none; }
+.fig-group summary::-webkit-details-marker { display: none; }
+.fig-group summary .t { font-weight: 500; }
+.fig-group summary .t small { color: var(--muted); font-weight: 400; margin-left: 6px; }
+.chip { font-family: var(--mono); font-size: 12px; padding: 2px 8px; border-radius: 999px; background: var(--soft); color: var(--muted); white-space: nowrap; }
+.chip.on { background: var(--accent); color: var(--accent-ink); }
+.fig-body { padding: 4px 12px 12px; display: flex; flex-direction: column; gap: 8px; }
+.frow { display: grid; grid-template-columns: minmax(0, 1fr) 7.5rem 3rem; gap: 10px; align-items: center; }
+.frow .fl { font-size: 13px; min-width: 0; }
+.frow .fl small { display: block; color: var(--muted); font-size: 11.5px; }
+.frow .num-in { width: 100%; padding: 6px 8px; font-family: var(--mono); }
+.frow .fs { text-align: right; font-family: var(--mono); font-size: 13px; color: var(--muted); }
+.frow .fs.on { color: var(--accent); font-weight: 500; }
+.fig-note { font-size: 12px; color: var(--muted); margin: 0; }
+@media (max-width: 520px) { .frow { grid-template-columns: minmax(0, 1fr) 6rem 2.6rem; } }
+
+/* links */
+.links { display: flex; flex-direction: column; gap: 8px; }
+.lrow { display: grid; grid-template-columns: minmax(0, 1fr) 6rem auto; gap: 8px; align-items: center; }
+.lrow select, .lrow input { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 6px 8px; min-width: 0; width: 100%; }
+
+/* verdict */
+.verdict { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); display: flex; flex-direction: column; gap: 16px; }
+.big { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.big .score { font-family: var(--display); font-size: 64px; line-height: 1; font-weight: 400; font-variant-numeric: tabular-nums; }
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-weight: 600; font-size: 13px; }
+.pill i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; background: currentColor; }
+.o-Succeeds { color: var(--succeeds); background: var(--zone-succeeds); }
+.o-Muddles { color: var(--muddles); background: var(--zone-muddles); }
+.o-Risk { color: var(--risk); background: var(--zone-risk); }
+.o-Erodes { color: var(--erodes); background: var(--zone-erodes); }
+.rankline { font-size: 13px; color: var(--muted); }
+.meter { position: relative; height: 46px; }
+.meter .track { position: absolute; left: 0; right: 0; top: 14px; height: 12px; border-radius: 3px; overflow: hidden; display: flex; }
+.meter .track span { height: 100%; }
+.meter .tick { position: absolute; top: 12px; width: 1px; height: 16px; background: var(--muted); opacity: .35; }
+.meter .marker { position: absolute; top: 6px; width: 3px; height: 28px; background: var(--ink); border-radius: 2px; transform: translateX(-1px); transition: left .25s ease; }
+.meter .axis { position: absolute; top: 32px; left: 0; right: 0; font-size: 11px; color: var(--muted); }
+.meter .axis span { position: absolute; transform: translateX(-50%); font-family: var(--mono); }
+@media (prefers-reduced-motion: reduce) { .meter .marker { transition: none; } }
+.steps { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 12px; font-size: 13.5px; margin: 0; }
+.steps dt { color: var(--muted); min-width: 0; }
+.steps dd { margin: 0; text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.steps .tot { color: var(--ink); font-weight: 600; border-top: 1px solid var(--line); padding-top: 6px; }
+.steps dd.tot { padding-top: 6px; }
+.drivers { display: flex; flex-direction: column; gap: 6px; }
+.drow { display: grid; grid-template-columns: minmax(0, 9.5rem) minmax(0, 1fr) 2.2rem; gap: 8px; align-items: center; font-size: 12.5px; }
+.drow .dn { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.drow .db { height: 8px; background: var(--soft); border-radius: 4px; overflow: hidden; }
+.drow .db span { display: block; height: 100%; background: var(--accent); border-radius: 4px; }
+.drow .dv { text-align: right; font-family: var(--mono); color: var(--muted); }
+.flag { font-size: 12.5px; color: var(--erodes); }
+
+/* ribbon */
+.ribbon h2 { font-family: var(--display); font-weight: 600; font-size: 20px; }
+.ribbon p.sub { margin: 4px 0 12px; color: var(--muted); font-size: 13px; }
+.rgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr)); gap: 4px 20px; }
+.ritem { display: grid; grid-template-columns: 1.8rem minmax(0, 1fr) 6rem 2.6rem; gap: 8px; align-items: center; padding: 4px 6px; border-radius: 4px; cursor: pointer; border: 0; background: transparent; text-align: left; font-size: 13px; width: 100%; }
+.ritem:hover { background: var(--soft); }
+.ritem.cur { background: var(--soft); outline: 1px solid var(--accent); }
+.ritem .rk { color: var(--muted); font-family: var(--mono); font-size: 12px; }
+.ritem .rn { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ritem .rn em { font-style: normal; color: var(--accent); font-size: 11px; margin-left: 4px; }
+.ritem .rb { height: 6px; background: var(--soft); border-radius: 3px; overflow: hidden; }
+.ritem .rb span { display: block; height: 100%; border-radius: 3px; }
+.ritem .rv { text-align: right; font-family: var(--mono); font-size: 12px; }
+.foot { font-size: 12px; color: var(--muted); }
+.foot p { margin: 0 0 6px; max-width: 80ch; }
+.confirm { display: inline-flex; gap: 6px; align-items: center; font-size: 13px; }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <div class="eyebrow">National Erosion Index · model v4</div>
+      <h1>Erosion Calculator</h1>
+      <p>Pick a country, adjust its scores or enter its figures, and see where it lands over a 10-year horizon. 1 is robust, 10 is critical erosion.</p>
+    </div>
+    <div class="status" id="status" role="status"><i></i><span>Connecting to your saved countries…</span></div>
+  </header>
+
+  <div class="bar">
+    <div class="field">
+      <label for="country">Country</label>
+      <select id="country"></select>
+    </div>
+    <button class="btn" id="newBtn" type="button">Add a new country</button>
+    <div class="field" id="nameField" hidden>
+      <label for="cname">Name</label>
+      <input type="text" id="cname" maxlength="60" placeholder="e.g. Kenya">
+    </div>
+    <div class="field" id="blocField" hidden>
+      <label for="cbloc">Group</label>
+      <select id="cbloc"><option value="North">Global North</option><option value="South">Global South</option></select>
+    </div>
+    <div class="field" id="regionField" hidden>
+      <label for="cregion">Region</label>
+      <input type="text" id="cregion" maxlength="40" placeholder="e.g. Africa">
+    </div>
+    <span class="dirty" id="dirty" hidden>Unsaved changes</span>
+    <button class="btn primary" id="saveBtn" type="button">Save</button>
+    <button class="btn ghost" id="resetBtn" type="button" hidden>Reset to model values</button>
+    <span class="confirm" id="delWrap" hidden>
+      <button class="btn ghost danger" id="delBtn" type="button">Delete</button>
+      <span id="delConfirm" hidden>Delete this country? <button class="btn danger" id="delYes" type="button">Delete</button> <button class="btn ghost" id="delNo" type="button">Keep</button></span>
+    </span>
+  </div>
+
+  <div class="main">
+    <section class="card inputs" aria-labelledby="inputsTitle">
+      <div class="inputs-head">
+        <div class="tabs" role="tablist" aria-label="How to score">
+          <button type="button" role="tab" id="tab-scores" aria-selected="true">Set scores</button>
+          <button type="button" role="tab" id="tab-figures" aria-selected="false">Enter figures</button>
+        </div>
+        <p id="modeHelp">Drag each slider from 1 (robust) to 10 (critical erosion).</p>
+      </div>
+      <h2 id="inputsTitle" class="eyebrow" style="margin:0">Principles</h2>
+      <div id="figures" hidden></div>
+      <div id="sliders"></div>
+      <div class="tier">
+        <div class="tier-h"><h3>Shock absorber</h3><span class="eyebrow">cuts the index by up to 25%</span></div>
+        <div class="srow" id="row-buffer">
+          <div class="lbl">Financial buffer<small>Sovereign funds, FX reserves, room to borrow. 10 is a very large buffer.</small></div>
+          <input type="range" id="s-buffer" min="1" max="10" step="1" aria-label="Financial buffer">
+          <div class="val num" id="v-buffer"></div>
+        </div>
+        <div class="srow" id="row-exposure">
+          <div class="lbl">Share held in global markets<small>This part is cut 40% to allow for a crash.</small></div>
+          <input type="range" id="s-exposure" min="0" max="100" step="5" aria-label="Share of buffer held in global markets">
+          <div class="val num" id="v-exposure"></div>
+        </div>
+      </div>
+      <div class="tier">
+        <div class="tier-h"><h3>Trade links</h3><span class="eyebrow">for imported spillover</span></div>
+        <p class="fig-note">Share of this country's exports going to each partner. Partners whose own home-grown index is above 4.5 pass part of their trouble on.</p>
+        <div class="links" id="links"></div>
+        <div><button class="btn" id="addLink" type="button">Add a trade partner</button></div>
+      </div>
+    </section>
+
+    <aside class="verdict" aria-live="polite">
+      <div class="card">
+        <div class="eyebrow" id="vName"></div>
+        <div class="big"><span class="score" id="vScore">—</span><span class="pill" id="vPill"><i></i><span></span></span></div>
+        <div class="rankline" id="vRank"></div>
+        <div class="meter" id="meter" aria-hidden="true">
+          <div class="track"><span style="flex:3;background:var(--zone-succeeds)"></span><span style="flex:1.5;background:var(--zone-muddles)"></span><span style="flex:1.5;background:var(--zone-risk)"></span><span style="flex:3;background:var(--zone-erodes)"></span></div>
+          <div id="ticks"></div>
+          <div class="marker" id="marker"></div>
+          <div class="axis"><span style="left:0%">1</span><span style="left:33.33%">4</span><span style="left:50%">5.5</span><span style="left:66.67%">7</span><span style="left:100%">10</span></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="eyebrow" style="margin-bottom:8px">How the score is built</div>
+        <dl class="steps" id="steps"></dl>
+        <p class="flag" id="flags" hidden></p>
+      </div>
+      <div class="card">
+        <div class="eyebrow" style="margin-bottom:10px">Biggest weighted drivers</div>
+        <div class="drivers" id="drivers"></div>
+      </div>
+    </aside>
+  </div>
+
+  <section class="card ribbon" aria-labelledby="rankTitle">
+    <h2 id="rankTitle">Where it sits among all countries</h2>
+    <p class="sub">Ranked from most erosion to least, including your saved countries and unsaved edits. Select a row to open it.</p>
+    <div class="rgrid" id="ribbon"></div>
+  </section>
+
+  <footer class="foot">
+    <p>Formula: weighted average of 14 principles (lethal ×3, serious ×2, background ×1) → 70% average + 30% worst lethal or serious score → cut by the shock absorber → plus spillover from trade partners above 4.5 → capped at 10. Bands: 7.0+ erodes first, 5.5–6.99 at risk, 4.0–5.49 muddles through, below 4.0 succeeds.</p>
+    <p>The 30 model countries use the scores from the National Erosion Index v4 (14 Oct 2026). The figures-to-score thresholds are a starting rubric, not calibrated on history. Countries you save are kept in your own account and are private to you.</p>
+  </footer>
+</div>
+
+<script>
+const MODEL = {"principles": [{"key": "debt_mil", "label": "Debt & military spending vs growth", "weight": 3, "tier": "Lethal", "pillar": "Fiscal & Monetary"}, {"key": "loose_money", "label": "Loose money / excessive debt creation", "weight": 3, "tier": "Lethal", "pillar": "Fiscal & Monetary"}, {"key": "instability", "label": "Political instability", "weight": 3, "tier": "Lethal", "pillar": "Human & Social"}, {"key": "conflict", "label": "Active conflict or war", "weight": 3, "tier": "Lethal", "pillar": "Conflict"}, {"key": "external", "label": "External fragility (foreign-currency debt, pegs, current-account deficit, IMF dependence)", "weight": 3, "tier": "Lethal", "pillar": "Fiscal & Monetary"}, {"key": "bubbles", "label": "Concentrated asset bubbles", "weight": 2, "tier": "Serious", "pillar": "Fiscal & Monetary"}, {"key": "security", "label": "Energy, food & medicine security", "weight": 2, "tier": "Serious", "pillar": "Resource & Environment"}, {"key": "trade", "label": "Trade viability (weak = high score)", "weight": 2, "tier": "Serious", "pillar": "Trade Viability"}, {"key": "crime", "label": "High crime", "weight": 2, "tier": "Serious", "pillar": "Human & Social"}, {"key": "climate", "label": "Physical climate risk (floods, heat, sea level)", "weight": 2, "tier": "Serious", "pillar": "Resource & Environment"}, {"key": "climate_trans", "label": "Climate transition risk (fossil-fuel & carbon-heavy dependence)", "weight": 2, "tier": "Serious", "pillar": "Resource & Environment"}, {"key": "human_cap", "label": "Under-investment in health & education", "weight": 1, "tier": "Background", "pillar": "Human & Social"}, {"key": "households", "label": "Slow household formation", "weight": 1, "tier": "Background", "pillar": "Human & Social"}, {"key": "pollution", "label": "Pollution (air, water, soil)", "weight": 1, "tier": "Background", "pillar": "Resource & Environment"}], "countries": [{"name": "United States", "region": "North America", "bloc": "North", "scores": {"debt_mil": 7, "loose_money": 7, "instability": 6, "conflict": 4, "external": 3, "bubbles": 7, "security": 2, "trade": 2, "crime": 6, "climate": 4, "climate_trans": 3, "human_cap": 4, "households": 5, "pollution": 3}, "buffer": 5.0, "exposure": 0.0, "bufferNote": "No fund, but dollar reserve status lets it borrow in a crisis", "drivers": "Debt ~124% of GDP heading to ~142% by 2031 with 7-8% deficits; AI-led equity concentration; deep polarisation. Buffered by reserve currency, energy self-sufficiency and tech moat.", "links": [{"partner": "Canada", "share": 0.17}, {"partner": "Mexico", "share": 0.16}, {"partner": "China", "share": 0.07}, {"partner": "Japan", "share": 0.04}, {"partner": "United Kingdom", "share": 0.04}, {"partner": "Germany", "share": 0.04}, {"partner": "South Korea", "share": 0.04}]}, {"name": "Canada", "region": "North America", "bloc": "North", "scores": {"debt_mil": 4, "loose_money": 4, "instability": 3, "conflict": 1, "external": 2, "bubbles": 8, "security": 1, "trade": 6, "crime": 3, "climate": 3, "climate_trans": 5, "human_cap": 3, "households": 7, "pollution": 2}, "buffer": 4.0, "exposure": 0.2, "bufferNote": "Moderate federal debt; pension funds are not government buffers", "drivers": "Severe housing bubble and ~75% export dependence on the US amid tariffs; strong resource base and stable institutions.", "links": [{"partner": "United States", "share": 0.76}, {"partner": "China", "share": 0.04}, {"partner": "United Kingdom", "share": 0.03}, {"partner": "Japan", "share": 0.02}]}, {"name": "Mexico", "region": "North America", "bloc": "South", "scores": {"debt_mil": 4, "loose_money": 4, "instability": 6, "conflict": 4, "external": 4, "bubbles": 3, "security": 5, "trade": 5, "crime": 9, "climate": 6, "climate_trans": 3, "human_cap": 6, "households": 4, "pollution": 6}, "buffer": 4.0, "exposure": 0.1, "bufferNote": "Reserves plus IMF flexible credit line", "drivers": "Cartel violence, judicial-reform uncertainty and the 2026 USMCA review; nearshoring is the upside.", "links": [{"partner": "United States", "share": 0.8}, {"partner": "Canada", "share": 0.03}, {"partner": "China", "share": 0.02}]}, {"name": "Brazil", "region": "South America", "bloc": "South", "scores": {"debt_mil": 7, "loose_money": 5, "instability": 6, "conflict": 1, "external": 3, "bubbles": 3, "security": 2, "trade": 3, "crime": 8, "climate": 6, "climate_trans": 4, "human_cap": 5, "households": 5, "pollution": 5}, "buffer": 4.0, "exposure": 0.1, "bufferNote": "About $350bn FX reserves; high public debt limits fiscal room", "drivers": "Debt ~90% of GDP with very high real rates making interest costly; high crime; October 2026 election. Food and energy self-sufficient.", "links": [{"partner": "China", "share": 0.3}, {"partner": "United States", "share": 0.11}, {"partner": "Argentina", "share": 0.04}]}, {"name": "Argentina", "region": "South America", "bloc": "South", "scores": {"debt_mil": 6, "loose_money": 6, "instability": 6, "conflict": 1, "external": 8, "bubbles": 2, "security": 2, "trade": 5, "crime": 6, "climate": 4, "climate_trans": 3, "human_cap": 5, "households": 5, "pollution": 3}, "buffer": 1.0, "exposure": 0.0, "bufferNote": "Negative net reserves; IMF-dependent", "drivers": "Inflation still ~33% (May 2026) though far below 2024 peaks; repeated default history. Vaca Muerta energy and lithium are rising strengths.", "links": [{"partner": "Brazil", "share": 0.16}, {"partner": "China", "share": 0.08}, {"partner": "United States", "share": 0.08}, {"partner": "India", "share": 0.04}]}, {"name": "United Kingdom", "region": "Europe", "bloc": "North", "scores": {"debt_mil": 7, "loose_money": 5, "instability": 5, "conflict": 2, "external": 5, "bubbles": 5, "security": 6, "trade": 5, "crime": 5, "climate": 3, "climate_trans": 2, "human_cap": 4, "households": 6, "pollution": 3}, "buffer": 3.0, "exposure": 0.0, "bufferNote": "No fund; high debt and gilt-market sensitivity", "drivers": "Debt ~100% of GDP with high gilt yields and ~1% growth; energy and food import dependence; populist pressure.", "links": [{"partner": "United States", "share": 0.15}, {"partner": "Germany", "share": 0.09}, {"partner": "China", "share": 0.05}]}, {"name": "Germany", "region": "Europe", "bloc": "North", "scores": {"debt_mil": 4, "loose_money": 3, "instability": 5, "conflict": 2, "external": 1, "bubbles": 2, "security": 7, "trade": 5, "crime": 3, "climate": 3, "climate_trans": 5, "human_cap": 3, "households": 7, "pollution": 3}, "buffer": 6.0, "exposure": 0.1, "bufferNote": "Low debt and euro membership give fiscal space; little sovereign fund", "drivers": "Stagnant growth (~0.9% euro area), energy import exposure, Chinese competition in autos; fiscal room still decent.", "links": [{"partner": "United States", "share": 0.1}, {"partner": "China", "share": 0.06}, {"partner": "United Kingdom", "share": 0.06}, {"partner": "Poland", "share": 0.06}]}, {"name": "Poland", "region": "Europe", "bloc": "North", "scores": {"debt_mil": 5, "loose_money": 4, "instability": 4, "conflict": 4, "external": 3, "bubbles": 3, "security": 4, "trade": 3, "crime": 2, "climate": 3, "climate_trans": 5, "human_cap": 4, "households": 8, "pollution": 6}, "buffer": 4.0, "exposure": 0.1, "bufferNote": "Adequate reserves; widening deficit from defence", "drivers": "Defence spending ~4.7% of GDP and wide deficit, frontline state; but strong growth and biggest GPI improvement in 2026.", "links": [{"partner": "Germany", "share": 0.28}, {"partner": "United Kingdom", "share": 0.05}]}, {"name": "Norway", "region": "Europe", "bloc": "North", "scores": {"debt_mil": 1, "loose_money": 2, "instability": 1, "conflict": 1, "external": 1, "bubbles": 4, "security": 1, "trade": 2, "crime": 1, "climate": 2, "climate_trans": 7, "human_cap": 1, "households": 6, "pollution": 1}, "buffer": 10.0, "exposure": 0.72, "bufferNote": "Oil fund ~NOK 22.7tn ($2.39tn), roughly 4-5x GDP; 72% equities", "drivers": "Sovereign wealth fund, energy surplus, very high stability. Main risk is a housing market and oil dependence.", "links": [{"partner": "United Kingdom", "share": 0.2}, {"partner": "Germany", "share": 0.2}, {"partner": "Poland", "share": 0.05}]}, {"name": "Russia", "region": "Europe", "bloc": "North", "scores": {"debt_mil": 8, "loose_money": 6, "instability": 5, "conflict": 10, "external": 3, "bubbles": 3, "security": 1, "trade": 9, "crime": 6, "climate": 4, "climate_trans": 9, "human_cap": 6, "households": 7, "pollution": 6}, "buffer": 4.0, "exposure": 0.1, "bufferNote": "National Wealth Fund drawn down; about half of reserves frozen abroad", "drivers": "Ranked least peaceful country in GPI 2026; war economy with military ~7% of GDP, sanctions and near-stalled growth. Resource self-sufficient.", "links": [{"partner": "China", "share": 0.3}, {"partner": "India", "share": 0.16}, {"partner": "Turkey", "share": 0.08}]}, {"name": "Ukraine", "region": "Europe", "bloc": "North", "scores": {"debt_mil": 10, "loose_money": 7, "instability": 6, "conflict": 10, "external": 9, "bubbles": 2, "security": 6, "trade": 7, "crime": 6, "climate": 4, "climate_trans": 2, "human_cap": 7, "households": 10, "pollution": 7}, "buffer": 1.0, "exposure": 0.0, "bufferNote": "Depends on external aid, which is not counted as a buffer", "drivers": "Active war with no ceasefire as of late Aug 2026; grid destroyed; population loss. Survival depends on external finance.", "links": [{"partner": "Poland", "share": 0.12}, {"partner": "Turkey", "share": 0.05}, {"partner": "China", "share": 0.05}, {"partner": "Germany", "share": 0.04}]}, {"name": "Turkey", "region": "Europe/Middle East", "bloc": "South", "scores": {"debt_mil": 5, "loose_money": 8, "instability": 7, "conflict": 3, "external": 8, "bubbles": 5, "security": 6, "trade": 4, "crime": 5, "climate": 6, "climate_trans": 2, "human_cap": 5, "households": 6, "pollution": 5}, "buffer": 2.0, "exposure": 0.0, "bufferNote": "Thin net reserves after years of drawdown", "drivers": "Inflation ~33% (May 2026), opposition crackdown; PKK peace process improving security. Diversified manufacturing near the EU.", "links": [{"partner": "Germany", "share": 0.08}, {"partner": "United Kingdom", "share": 0.06}, {"partner": "United States", "share": 0.06}, {"partner": "United Arab Emirates", "share": 0.04}, {"partner": "Russia", "share": 0.03}]}, {"name": "Israel", "region": "Middle East", "bloc": "North", "scores": {"debt_mil": 7, "loose_money": 4, "instability": 8, "conflict": 9, "external": 2, "bubbles": 4, "security": 5, "trade": 5, "crime": 4, "climate": 5, "climate_trans": 2, "human_cap": 3, "households": 1, "pollution": 4}, "buffer": 5.0, "exposure": 0.2, "bufferNote": "About $200bn+ FX reserves", "drivers": "Bottom-5 in GPI 2026; Gaza and 2026 Iran war spending; political fracture. Tech moat and high fertility are offsets.", "links": [{"partner": "United States", "share": 0.25}, {"partner": "China", "share": 0.05}, {"partner": "India", "share": 0.03}]}, {"name": "Saudi Arabia", "region": "Middle East", "bloc": "South", "scores": {"debt_mil": 5, "loose_money": 3, "instability": 3, "conflict": 5, "external": 4, "bubbles": 5, "security": 4, "trade": 4, "crime": 2, "climate": 8, "climate_trans": 9, "human_cap": 4, "households": 4, "pollution": 6}, "buffer": 7.0, "exposure": 0.4, "bufferNote": "Central bank reserves plus PIF, but much of PIF is domestic and illiquid", "drivers": "Iran-war strikes on energy sites; 2026 growth cut to ~1.7%; giga-project spending widens deficits. Large reserves and east-west pipeline.", "links": [{"partner": "China", "share": 0.16}, {"partner": "India", "share": 0.1}, {"partner": "Japan", "share": 0.09}, {"partner": "South Korea", "share": 0.09}, {"partner": "United Arab Emirates", "share": 0.05}]}, {"name": "United Arab Emirates", "region": "Middle East", "bloc": "South", "scores": {"debt_mil": 2, "loose_money": 2, "instability": 2, "conflict": 6, "external": 2, "bubbles": 6, "security": 5, "trade": 3, "crime": 1, "climate": 8, "climate_trans": 6, "human_cap": 3, "households": 6, "pollution": 6}, "buffer": 9.0, "exposure": 0.6, "bufferNote": "ADIA, Mubadala and other funds well above GDP; large equity share", "drivers": "Fujairah energy site struck in March 2026; Dubai property cycle; strong reserves and hub status.", "links": [{"partner": "India", "share": 0.12}, {"partner": "Japan", "share": 0.08}, {"partner": "China", "share": 0.08}, {"partner": "Saudi Arabia", "share": 0.05}]}, {"name": "Egypt", "region": "Africa", "bloc": "South", "scores": {"debt_mil": 9, "loose_money": 8, "instability": 5, "conflict": 4, "external": 8, "bubbles": 4, "security": 9, "trade": 6, "crime": 4, "climate": 8, "climate_trans": 3, "human_cap": 7, "households": 2, "pollution": 8}, "buffer": 1.0, "exposure": 0.0, "bufferNote": "Depends on Gulf deposits and IMF support", "drivers": "Interest costs consume most revenue; major LNG and wheat importer hit by the Hormuz shock (fuel prices raised ~30% in March 2026); inflation ~15%.", "links": [{"partner": "Turkey", "share": 0.07}, {"partner": "Saudi Arabia", "share": 0.05}, {"partner": "United Arab Emirates", "share": 0.05}, {"partner": "United States", "share": 0.05}]}, {"name": "Nigeria", "region": "Africa", "bloc": "South", "scores": {"debt_mil": 8, "loose_money": 7, "instability": 7, "conflict": 7, "external": 6, "bubbles": 3, "security": 7, "trade": 6, "crime": 9, "climate": 8, "climate_trans": 9, "human_cap": 9, "households": 1, "pollution": 8}, "buffer": 2.0, "exposure": 0.0, "bufferNote": "Small sovereign fund and thin reserves relative to needs", "drivers": "Debt service absorbs a large share of thin revenue; insurgency and banditry; inflation ~16%; food insecurity. Young population is the upside.", "links": [{"partner": "India", "share": 0.14}, {"partner": "United States", "share": 0.07}]}, {"name": "South Africa", "region": "Africa", "bloc": "South", "scores": {"debt_mil": 7, "loose_money": 4, "instability": 5, "conflict": 1, "external": 4, "bubbles": 3, "security": 6, "trade": 5, "crime": 10, "climate": 6, "climate_trans": 6, "human_cap": 6, "households": 4, "pollution": 6}, "buffer": 3.0, "exposure": 0.1, "bufferNote": "Modest reserves; rising debt", "drivers": "Extreme crime, ~1% growth and rising debt-interest burden; coalition government steadier than feared; critical minerals.", "links": [{"partner": "China", "share": 0.1}, {"partner": "United States", "share": 0.08}, {"partner": "Germany", "share": 0.07}, {"partner": "Japan", "share": 0.05}, {"partner": "India", "share": 0.05}, {"partner": "United Kingdom", "share": 0.04}]}, {"name": "Ethiopia", "region": "Africa", "bloc": "South", "scores": {"debt_mil": 8, "loose_money": 7, "instability": 8, "conflict": 8, "external": 9, "bubbles": 2, "security": 8, "trade": 7, "crime": 6, "climate": 8, "climate_trans": 1, "human_cap": 8, "households": 1, "pollution": 6}, "buffer": 1.0, "exposure": 0.0, "bufferNote": "Restructuring; minimal reserves", "drivers": "Post-2023 default restructuring, regional insurgencies, food insecurity, inflation ~12%.", "links": [{"partner": "United States", "share": 0.1}, {"partner": "Saudi Arabia", "share": 0.08}, {"partner": "United Arab Emirates", "share": 0.07}, {"partner": "China", "share": 0.05}]}, {"name": "China", "region": "Asia", "bloc": "South", "scores": {"debt_mil": 6, "loose_money": 7, "instability": 3, "conflict": 3, "external": 1, "bubbles": 8, "security": 5, "trade": 4, "crime": 2, "climate": 5, "climate_trans": 2, "human_cap": 4, "households": 9, "pollution": 7}, "buffer": 7.0, "exposure": 0.2, "bufferNote": "About $3tn FX reserves, mostly bonds; offset by heavy local-government debt", "drivers": "Property bust and local-government debt; IMF says China is a main driver of global debt growth; fertility ~1.0; still a manufacturing superpower.", "links": [{"partner": "United States", "share": 0.15}, {"partner": "Japan", "share": 0.05}, {"partner": "Vietnam", "share": 0.05}, {"partner": "South Korea", "share": 0.04}, {"partner": "India", "share": 0.03}, {"partner": "Germany", "share": 0.03}, {"partner": "Russia", "share": 0.03}]}, {"name": "Japan", "region": "Asia", "bloc": "North", "scores": {"debt_mil": 8, "loose_money": 7, "instability": 3, "conflict": 1, "external": 1, "bubbles": 3, "security": 8, "trade": 3, "crime": 1, "climate": 5, "climate_trans": 4, "human_cap": 2, "households": 9, "pollution": 3}, "buffer": 6.0, "exposure": 0.3, "bufferNote": "About $1.2tn FX reserves and large net foreign assets; gross public debt very high", "drivers": "Debt ~230% of GDP as rates rise; weakest growth among large economies (~0.6%); imports nearly all energy. Very safe, stable society.", "links": [{"partner": "United States", "share": 0.2}, {"partner": "China", "share": 0.17}, {"partner": "South Korea", "share": 0.07}]}, {"name": "South Korea", "region": "Asia", "bloc": "North", "scores": {"debt_mil": 3, "loose_money": 5, "instability": 5, "conflict": 3, "external": 2, "bubbles": 6, "security": 8, "trade": 3, "crime": 2, "climate": 3, "climate_trans": 3, "human_cap": 2, "households": 10, "pollution": 5}, "buffer": 5.0, "exposure": 0.3, "bufferNote": "About $400bn FX reserves; moderate public debt", "drivers": "World's lowest fertility; very high household debt; energy import dependent; semiconductor strength lifts 2026 growth to ~2.6%.", "links": [{"partner": "China", "share": 0.19}, {"partner": "United States", "share": 0.18}, {"partner": "Vietnam", "share": 0.08}, {"partner": "Japan", "share": 0.05}]}, {"name": "Singapore", "region": "Asia", "bloc": "North", "scores": {"debt_mil": 2, "loose_money": 2, "instability": 1, "conflict": 1, "external": 1, "bubbles": 4, "security": 7, "trade": 2, "crime": 1, "climate": 5, "climate_trans": 3, "human_cap": 1, "households": 8, "pollution": 2}, "buffer": 9.0, "exposure": 0.6, "bufferNote": "GIC, Temasek and MAS reserves well above GDP; large equity share", "drivers": "Top-10 in GPI 2026; asset-backed public balance sheet, global hub. Imports nearly all food and energy; very low fertility.", "links": [{"partner": "China", "share": 0.14}, {"partner": "United States", "share": 0.11}, {"partner": "Indonesia", "share": 0.07}]}, {"name": "India", "region": "Asia", "bloc": "South", "scores": {"debt_mil": 5, "loose_money": 4, "instability": 4, "conflict": 4, "external": 3, "bubbles": 4, "security": 6, "trade": 4, "crime": 5, "climate": 8, "climate_trans": 3, "human_cap": 6, "households": 3, "pollution": 9}, "buffer": 5.0, "exposure": 0.1, "bufferNote": "About $650-700bn FX reserves", "drivers": "Fastest-growing large economy (~6.4%) but heavy interest bill, severe pollution and climate exposure; GPI rank fell to 127th.", "links": [{"partner": "United States", "share": 0.18}, {"partner": "United Arab Emirates", "share": 0.08}, {"partner": "China", "share": 0.04}, {"partner": "United Kingdom", "share": 0.03}]}, {"name": "Pakistan", "region": "Asia", "bloc": "South", "scores": {"debt_mil": 9, "loose_money": 7, "instability": 8, "conflict": 6, "external": 9, "bubbles": 3, "security": 8, "trade": 7, "crime": 7, "climate": 9, "climate_trans": 2, "human_cap": 8, "households": 2, "pollution": 9}, "buffer": 1.0, "exposure": 0.0, "bufferNote": "IMF-dependent; reserves cover only a few months of imports", "drivers": "Interest and military consume most revenue; IMF-dependent; inflation ~11%; extreme climate and pollution exposure. Debt now edging down (~70% of GDP).", "links": [{"partner": "United States", "share": 0.17}, {"partner": "China", "share": 0.08}, {"partner": "United Kingdom", "share": 0.07}, {"partner": "United Arab Emirates", "share": 0.05}, {"partner": "Germany", "share": 0.05}]}, {"name": "Bangladesh", "region": "Asia", "bloc": "South", "scores": {"debt_mil": 4, "loose_money": 5, "instability": 7, "conflict": 2, "external": 6, "bubbles": 3, "security": 7, "trade": 5, "crime": 6, "climate": 10, "climate_trans": 1, "human_cap": 7, "households": 3, "pollution": 9}, "buffer": 2.0, "exposure": 0.0, "bufferNote": "Reserves rebuilt but low", "drivers": "Post-2024 political transition; garment export concentration; LNG import exposure; among the world's most climate-exposed countries.", "links": [{"partner": "United States", "share": 0.18}, {"partner": "Germany", "share": 0.15}, {"partner": "United Kingdom", "share": 0.1}, {"partner": "Poland", "share": 0.03}]}, {"name": "Vietnam", "region": "Asia", "bloc": "South", "scores": {"debt_mil": 2, "loose_money": 4, "instability": 3, "conflict": 2, "external": 3, "bubbles": 5, "security": 4, "trade": 3, "crime": 3, "climate": 8, "climate_trans": 2, "human_cap": 4, "households": 5, "pollution": 7}, "buffer": 3.0, "exposure": 0.1, "bufferNote": "Modest reserves; low public debt", "drivers": "FDI manufacturing hub with low debt; property and banking stress; Mekong delta climate risk; US tariff exposure.", "links": [{"partner": "United States", "share": 0.3}, {"partner": "China", "share": 0.17}, {"partner": "South Korea", "share": 0.07}, {"partner": "Japan", "share": 0.06}]}, {"name": "Indonesia", "region": "Asia", "bloc": "South", "scores": {"debt_mil": 3, "loose_money": 4, "instability": 5, "conflict": 2, "external": 4, "bubbles": 3, "security": 3, "trade": 3, "crime": 4, "climate": 7, "climate_trans": 6, "human_cap": 5, "households": 4, "pollution": 7}, "buffer": 4.0, "exposure": 0.1, "bufferNote": "Adequate FX reserves; low debt", "drivers": "Low debt and nickel leverage; 2025 street protests and fiscal-credibility worries; resource self-sufficient.", "links": [{"partner": "China", "share": 0.24}, {"partner": "United States", "share": 0.1}, {"partner": "India", "share": 0.08}, {"partner": "Japan", "share": 0.08}]}, {"name": "Australia", "region": "Oceania", "bloc": "North", "scores": {"debt_mil": 3, "loose_money": 4, "instability": 2, "conflict": 1, "external": 4, "bubbles": 8, "security": 4, "trade": 4, "crime": 2, "climate": 7, "climate_trans": 6, "human_cap": 2, "households": 5, "pollution": 2}, "buffer": 5.0, "exposure": 0.5, "bufferNote": "Future Fund and moderate public debt; floating currency", "drivers": "One of the world's most expensive housing markets; ~90% of liquid fuel imported; export concentration on China (iron ore, LNG). Strong institutions and resources.", "links": [{"partner": "China", "share": 0.33}, {"partner": "Japan", "share": 0.14}, {"partner": "South Korea", "share": 0.07}, {"partner": "India", "share": 0.05}, {"partner": "United States", "share": 0.04}]}, {"name": "New Zealand", "region": "Oceania", "bloc": "North", "scores": {"debt_mil": 3, "loose_money": 3, "instability": 2, "conflict": 1, "external": 5, "bubbles": 6, "security": 5, "trade": 4, "crime": 3, "climate": 5, "climate_trans": 2, "human_cap": 3, "households": 5, "pollution": 1}, "buffer": 4.0, "exposure": 0.4, "bufferNote": "NZ Super Fund and low-moderate debt", "drivers": "2nd in GPI 2026; housing correction; fuel import dependence; dairy export concentration.", "links": [{"partner": "China", "share": 0.25}, {"partner": "Australia", "share": 0.12}, {"partner": "United States", "share": 0.12}, {"partner": "Japan", "share": 0.06}]}]};
+
+/* Figures rubric: each indicator maps a raw figure to a 1–10 score by straight lines between anchor points (value, score), sorted by value. */
+const IND = [
+  // Debt & military vs growth
+  {id:'gov_debt', p:'debt_mil', label:'Government gross debt', unit:'% of GDP', a:[[30,1],[60,4],[90,7],[130,9],[200,10]]},
+  {id:'interest_rev', p:'debt_mil', label:'Interest payments', unit:'% of revenue', a:[[3,1],[10,4],[20,7],[35,9],[50,10]]},
+  {id:'military', p:'debt_mil', label:'Military spending', unit:'% of GDP', a:[[1,1],[2,3],[4,6],[7,9],[10,10]]},
+  {id:'growth', p:'debt_mil', label:'Real GDP growth', unit:'% a year', a:[[-2,10],[0,9],[1,7],[2,5],[4,3],[6,1]]},
+  // Loose money
+  {id:'inflation', p:'loose_money', label:'Consumer price inflation', unit:'% a year', a:[[2,1],[4,3],[8,6],[20,8],[50,10]]},
+  {id:'deficit', p:'loose_money', label:'Budget deficit', unit:'% of GDP', a:[[0,1],[3,4],[6,7],[10,10]], hint:'Enter a deficit as a positive number; a surplus as negative.'},
+  {id:'credit_growth', p:'loose_money', label:'Private credit growth', unit:'% a year', a:[[3,1],[8,4],[15,7],[25,10]]},
+  // Instability
+  {id:'polstab', p:'instability', label:'Political stability estimate', unit:'−2.5 to 2.5', a:[[-2,10],[-1,7],[0,5],[0.5,3],[1.5,1]], hint:'World Bank governance indicator; higher is more stable.'},
+  {id:'unrest', p:'instability', label:'Major unrest or contested handover in the last 2 years', yn:[8,2]},
+  // Conflict (uses the worst indicator)
+  {id:'battle_deaths', p:'conflict', label:'Conflict deaths, last 12 months', unit:'thousands', a:[[0,1],[0.1,3],[1,5],[10,8],[50,10]]},
+  {id:'at_war', p:'conflict', label:'Directly involved in a war between states', yn:[9,1]},
+  // External fragility
+  {id:'current_acct', p:'external', label:'Current-account balance', unit:'% of GDP', a:[[-10,10],[-6,7],[-3,5],[0,3],[5,1]], hint:'A deficit is negative.'},
+  {id:'ext_debt_exports', p:'external', label:'External debt', unit:'% of exports', a:[[50,1],[100,3],[200,6],[300,8],[400,10]]},
+  {id:'reserve_months', p:'external', label:'FX reserves', unit:'months of imports', a:[[1,10],[2,8],[3,6],[6,3],[12,1]]},
+  {id:'peg', p:'external', label:'Currency pegged or held in a managed band', yn:[7,2]},
+  {id:'imf', p:'external', label:'Relies on an IMF programme', yn:[8,1]},
+  // Bubbles
+  {id:'house_5y', p:'bubbles', label:'Real house price rise, last 5 years', unit:'%', a:[[0,1],[15,3],[30,6],[50,8],[80,10]]},
+  {id:'price_income', p:'bubbles', label:'House price to income ratio', unit:'×', a:[[4,1],[6,3],[8,5],[11,8],[15,10]]},
+  {id:'credit_gap', p:'bubbles', label:'Credit-to-GDP gap', unit:'pp', a:[[-5,1],[0,3],[5,5],[10,8],[15,10]], hint:'BIS early-warning measure.'},
+  // Security
+  {id:'energy_imports', p:'security', label:'Net energy imports', unit:'% of energy use', a:[[-50,1],[0,2],[30,4],[60,6],[90,9],[100,10]], hint:'Negative for an energy exporter.'},
+  {id:'food_imports', p:'security', label:'Cereal supply imported', unit:'%', a:[[0,1],[20,3],[50,6],[80,9],[100,10]]},
+  // Trade (weak = high)
+  {id:'top_partner', p:'trade', label:'Exports going to the top partner', unit:'%', a:[[15,2],[25,4],[40,6],[60,8],[80,10]]},
+  {id:'export_growth', p:'trade', label:'Export growth, 5-year average', unit:'% a year', a:[[-4,9],[0,6],[4,3],[8,1]]},
+  {id:'sanctions', p:'trade', label:'Under major Western sanctions', yn:[9,1]},
+  // Crime
+  {id:'homicide', p:'crime', label:'Homicide rate', unit:'per 100,000', a:[[1,1],[3,3],[6,5],[15,8],[30,10]]},
+  // Physical climate
+  {id:'ndgain_vuln', p:'climate', label:'ND-GAIN vulnerability score', unit:'0 to 1', a:[[0.3,1],[0.38,3],[0.45,5],[0.52,8],[0.6,10]], hint:'Higher is more vulnerable.'},
+  {id:'low_coast', p:'climate', label:'Population in low coastal zones', unit:'%', a:[[1,1],[5,3],[10,5],[20,8],[30,10]]},
+  // Transition
+  {id:'fossil_exports', p:'climate_trans', label:'Fossil fuels in goods exports', unit:'%', a:[[5,1],[15,3],[30,5],[50,7],[75,9],[90,10]]},
+  {id:'fossil_revenue', p:'climate_trans', label:'Fossil-fuel revenue in the budget', unit:'% of revenue', a:[[0,1],[10,3],[25,5],[50,8],[70,10]]},
+  // Health & education
+  {id:'hed_spend', p:'human_cap', label:'Public health and education spending', unit:'% of GDP', a:[[3,10],[5,7],[7,5],[9,3],[12,1]]},
+  {id:'hci', p:'human_cap', label:'Human Capital Index', unit:'0 to 1', a:[[0.4,10],[0.5,7],[0.6,5],[0.7,3],[0.8,1]], hint:'World Bank.'},
+  // Households
+  {id:'fertility', p:'households', label:'Total fertility rate', unit:'births per woman', a:[[0.8,10],[1.2,8],[1.5,5],[1.8,3],[2.1,1]]},
+  // Pollution
+  {id:'pm25', p:'pollution', label:'Fine particle air pollution (PM2.5)', unit:'µg/m³', a:[[5,1],[10,3],[25,5],[50,8],[80,10]]},
+  // Buffer
+  {id:'buf_assets', p:'_buffer', label:'Sovereign fund assets plus FX reserves', unit:'% of GDP', a:[[0,1],[10,2],[25,4],[50,6],[100,8],[250,10]], higherBetter:true},
+  {id:'buf_reserve_ccy', p:'_buffer', label:'Issues a global reserve currency', yn:[5,0], hint:'If yes, the buffer is at least 5.'},
+  {id:'buf_exposure', p:'_exposure', label:'Share of that buffer in global markets', unit:'%', a:[[0,0],[100,100]]},
+];
+const MAXAGG = new Set(['conflict']);
+
+const P = MODEL.principles;
+const TW = P.reduce((s, p) => s + p.weight, 0);
+const ACUTE = P.filter(p => p.weight >= 2);
+const SHORT = {debt_mil:'Debt & military vs growth', loose_money:'Loose money & debt creation', instability:'Political instability', conflict:'Active conflict or war', external:'External fragility', bubbles:'Asset bubbles', security:'Energy, food & medicine security', trade:'Trade weakness', crime:'Crime', climate:'Physical climate risk', climate_trans:'Climate transition risk', human_cap:'Health & education', households:'Household formation', pollution:'Pollution'};
+const SUBS = {debt_mil:'Debt, interest and military spending against growth', loose_money:'Inflation, deficits, credit creation', instability:'Unrest, contested power', conflict:'War at home or abroad', external:'Foreign-currency debt, pegs, current-account deficits, IMF reliance', bubbles:'Housing or credit concentrated in one sector', security:'Dependence on imported energy, food, medicine', trade:'Concentrated markets, sanctions, falling exports', crime:'Violent crime', climate:'Floods, heat, sea level', climate_trans:'Dependence on fossil fuels or carbon-heavy industry', human_cap:'Under-investment in people', households:'Low fertility, slow new households', pollution:'Air, water, soil'};
+
+/* ---------- state ---------- */
+const base = new Map(MODEL.countries.map(c => [c.name, c]));
+let saved = new Map();          // docId -> saved record
+let current = null;             // working copy being edited
+let mode = 'scores';
+let col = null;                 // db collection, or null
+let canSave = false;
+
+const $ = id => document.getElementById(id);
+const clone = o => JSON.parse(JSON.stringify(o));
+const slug = s => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60) || 'x';
+const f2 = x => (Math.round(x * 100) / 100).toFixed(2);
+const outlook = x => x >= 7 ? 'Erodes first' : x >= 5.5 ? 'At risk' : x >= 4 ? 'Muddles through' : 'Succeeds';
+const OCLS = {'Erodes first':'Erodes', 'At risk':'Risk', 'Muddles through':'Muddles', 'Succeeds':'Succeeds'};
+const OCOL = {'Erodes first':'var(--erodes)', 'At risk':'var(--risk)', 'Muddles through':'var(--muddles)', 'Succeeds':'var(--succeeds)'};
+
+function interp(a, v) {
+  if (v <= a[0][0]) return a[0][1];
+  for (let i = 1; i < a.length; i++) {
+    if (v <= a[i][0]) { const [x0, y0] = a[i - 1], [x1, y1] = a[i]; return y0 + (y1 - y0) * (v - x0) / (x1 - x0); }
+  }
+  return a[a.length - 1][1];
+}
+function indScore(ind, raw) {
+  if (raw === undefined || raw === null || raw === '') return null;
+  if (ind.yn) return raw === 'yes' ? ind.yn[0] : null;
+  const v = Number(raw); if (!isFinite(v)) return null;
+  return interp(ind.a, v);
+}
+
+/* Effective inputs for a record: in figures mode, any principle with at least one figure takes its score from the figures. */
+function effective(rec, useFigures) {
+  const scores = clone(rec.scores); let buffer = rec.buffer, exposure = rec.exposure; const derived = {};
+  if (useFigures && rec.figures) {
+    for (const p of P) {
+      const inds = IND.filter(i => i.p === p.key);
+      const nums = inds.filter(i => !i.yn).map(i => indScore(i, rec.figures[i.id])).filter(v => v !== null);
+      const flags = inds.filter(i => i.yn).map(i => indScore(i, rec.figures[i.id])).filter(v => v !== null);
+      const answered = inds.some(i => i.yn && rec.figures[i.id] === 'no');
+      if (nums.length || flags.length || answered) {
+        const base = nums.length ? (MAXAGG.has(p.key) ? Math.max(...nums) : nums.reduce((a, b) => a + b, 0) / nums.length) : 1;
+        const s = Math.max(base, ...flags);
+        scores[p.key] = Math.max(1, Math.min(10, Math.round(s * 10) / 10)); derived[p.key] = true;
+      }
+    }
+    const ba = indScore(IND.find(i => i.id === 'buf_assets'), rec.figures.buf_assets);
+    const rc = rec.figures.buf_reserve_ccy;
+    if (ba !== null || rc === 'yes') { let b = ba === null ? buffer : ba; if (rc === 'yes') b = Math.max(b, 5); buffer = Math.round(b * 10) / 10; derived._buffer = true; }
+    const ex = rec.figures.buf_exposure;
+    if (ex !== undefined && ex !== '' && isFinite(Number(ex))) { exposure = Math.max(0, Math.min(1, Number(ex) / 100)); derived._exposure = true; }
+  }
+  return {scores, buffer, exposure, derived};
+}
+
+/* v4 model: blend, shock absorber, home-grown index, one round of trade spillover. */
+function computeAll(list) {
+  const R = new Map();
+  for (const c of list) {
+    const avg = P.reduce((s, p) => s + c.eff.scores[p.key] * p.weight, 0) / TW;
+    let wp = ACUTE[0];
+    for (const p of ACUTE) if (c.eff.scores[p.key] > c.eff.scores[wp.key]) wp = p;
+    const worst = c.eff.scores[wp.key];
+    const blend = 0.7 * avg + 0.3 * worst;
+    const eff = c.eff.buffer * (1 - 0.4 * c.eff.exposure);
+    const off = 0.25 * (eff - 1) / 9;
+    R.set(c.name, {c, avg, worst, wp, blend, effBuf: eff, off, home: blend * (1 - off)});
+  }
+  for (const r of R.values()) {
+    let sp = 0, top = null, topV = 0;
+    for (const l of (r.c.links || [])) {
+      const pr = R.get(l.partner); if (!pr || l.partner === r.c.name) continue;
+      const v = Number(l.share) * Math.max(0, pr.home - 4.5);
+      sp += v; if (v > topV) { topV = v; top = l.partner; }
+    }
+    r.spill = sp * (1 - r.off); r.spillSrc = top;
+    r.final = Math.min(10, r.home + r.spill);
+    r.lethal = P.filter(p => p.weight === 3 && r.c.eff.scores[p.key] >= 8).map(p => SHORT[p.key]);
+  }
+  const rows = [...R.values()].sort((a, b) => b.final - a.final);
+  rows.forEach((r, i) => r.rank = i + 1);
+  return rows;
+}
+
+/* All countries as the viewer sees them: model countries (with any saved version applied), saved new countries, and the open edit. */
+function universe() {
+  const out = [];
+  for (const b of MODEL.countries) {
+    const sv = saved.get('base-' + slug(b.name));
+    const rec = sv ? Object.assign(clone(b), sv) : clone(b);
+    rec.name = b.name; rec._mine = !!sv;
+    out.push(rec);
+  }
+  for (const [id, sv] of saved) if (!sv.base) out.push(Object.assign({}, clone(sv), {_mine: true, _id: id}));
+  if (current) {
+    const live = Object.assign(clone(current), {_live: true});
+    const i = current._new ? -1 : current.base ? out.findIndex(r => !r._id && r.name === current.base) : out.findIndex(r => r._id === current._id);
+    if (i >= 0) out[i] = live; else out.push(live);
+  }
+  for (const r of out) r.eff = effective(r, r.mode === 'figures');
+  return out;
+}
+
+/* ---------- rendering ---------- */
+function buildSliders() {
+  const box = $('sliders'); box.textContent = '';
+  for (const [tier, w, note] of [['Lethal', 3, 'weight ×3'], ['Serious', 2, 'weight ×2'], ['Background', 1, 'weight ×1']]) {
+    const t = document.createElement('div'); t.className = 'tier';
+    const h = document.createElement('div'); h.className = 'tier-h';
+    const h3 = document.createElement('h3'); h3.textContent = tier; const e = document.createElement('span'); e.className = 'eyebrow'; e.textContent = note;
+    h.append(h3, e); t.appendChild(h);
+    for (const p of P.filter(p => p.weight === w)) {
+      const row = document.createElement('div'); row.className = 'srow'; row.id = 'row-' + p.key;
+      const l = document.createElement('div'); l.className = 'lbl'; l.textContent = SHORT[p.key];
+      const sm = document.createElement('small'); sm.textContent = SUBS[p.key]; l.appendChild(sm);
+      const r = document.createElement('input'); r.type = 'range'; r.min = 1; r.max = 10; r.step = 1; r.id = 's-' + p.key; r.setAttribute('aria-label', SHORT[p.key]);
+      r.addEventListener('input', () => { current.scores[p.key] = Number(r.value); touch(); });
+      const v = document.createElement('div'); v.className = 'val num'; v.id = 'v-' + p.key;
+      row.append(l, r, v); t.appendChild(row);
+    }
+    box.appendChild(t);
+  }
+  $('s-buffer').addEventListener('input', e => { current.buffer = Number(e.target.value); touch(); });
+  $('s-exposure').addEventListener('input', e => { current.exposure = Number(e.target.value) / 100; touch(); });
+}
+
+function buildFigures() {
+  const box = $('figures'); box.textContent = '';
+  const note = document.createElement('p'); note.className = 'fig-note';
+  note.textContent = 'Fill in what you know. A principle with at least one figure is scored from its figures: the average of its numbers (the worst, for conflict), raised to any floor a Yes answer sets. A principle left blank keeps its slider score. Each hint shows the thresholds used, as figure→score.';
+  box.appendChild(note);
+  const groups = [...P.map(p => ({key: p.key, title: SHORT[p.key], sub: p.tier})), {key: '_buffer', title: 'Shock absorber', sub: 'buffer'}];
+  for (const g of groups) {
+    const inds = IND.filter(i => i.p === g.key || (g.key === '_buffer' && i.p === '_exposure'));
+    const d = document.createElement('details'); d.className = 'fig-group'; d.id = 'fg-' + g.key;
+    const s = document.createElement('summary');
+    const t = document.createElement('span'); t.className = 't'; t.textContent = g.title; const sm = document.createElement('small'); sm.textContent = g.sub; t.appendChild(sm);
+    const chip = document.createElement('span'); chip.className = 'chip'; chip.id = 'fc-' + g.key;
+    s.append(t, chip); d.appendChild(s);
+    const body = document.createElement('div'); body.className = 'fig-body';
+    for (const ind of inds) {
+      const row = document.createElement('div'); row.className = 'frow';
+      const l = document.createElement('label'); l.className = 'fl'; l.htmlFor = 'f-' + ind.id; l.textContent = ind.label;
+      const hint = document.createElement('small');
+      hint.textContent = ind.yn ? (ind.hint || ('Yes sets a floor of ' + ind.yn[0] + ' for this principle. No leaves it to the other figures.'))
+        : ind.unit + (ind.p.startsWith('_') ? '' : ' · ' + ind.a.map(([v, sc]) => v + '→' + sc).join(', ')) + (ind.hint ? '. ' + ind.hint : '');
+      l.appendChild(hint);
+      let inp;
+      if (ind.yn) {
+        inp = document.createElement('select'); inp.className = 'num-in';
+        for (const [v, tx] of [['', '—'], ['yes', 'Yes'], ['no', 'No']]) { const o = document.createElement('option'); o.value = v; o.textContent = tx; inp.appendChild(o); }
+        inp.addEventListener('change', () => { setFig(ind.id, inp.value); });
+      } else {
+        inp = document.createElement('input'); inp.type = 'number'; inp.step = 'any'; inp.className = 'num-in'; inp.inputMode = 'decimal';
+        inp.addEventListener('input', () => { setFig(ind.id, inp.value); });
+      }
+      inp.id = 'f-' + ind.id;
+      const sc = document.createElement('div'); sc.className = 'fs'; sc.id = 'fs-' + ind.id; sc.textContent = '—';
+      row.append(l, inp, sc); body.appendChild(row);
+    }
+    d.appendChild(body); box.appendChild(d);
+  }
+}
+function setFig(id, v) { current.figures = current.figures || {}; if (v === '') delete current.figures[id]; else current.figures[id] = v; touch(); }
+
+function fillInputs() {
+  for (const p of P) { $('s-' + p.key).value = current.scores[p.key]; }
+  $('s-buffer').value = current.buffer; $('s-exposure').value = Math.round(current.exposure * 100);
+  for (const ind of IND) { const el = $('f-' + ind.id); const v = (current.figures || {})[ind.id]; el.value = v === undefined ? '' : v; }
+  $('cname').value = current.name; $('cbloc').value = current.bloc || 'South'; $('cregion').value = current.region || '';
+  buildLinks();
+}
+
+function buildLinks() {
+  const box = $('links'); box.textContent = '';
+  const names = universe().map(r => r.name).filter(n => n !== current.name).sort();
+  (current.links || []).forEach((l, i) => {
+    const row = document.createElement('div'); row.className = 'lrow';
+    const sel = document.createElement('select'); sel.id = 'lp-' + i; sel.setAttribute('aria-label', 'Trade partner');
+    for (const n of names) { const o = document.createElement('option'); o.value = n; o.textContent = n; sel.appendChild(o); }
+    if (!names.includes(l.partner)) { const o = document.createElement('option'); o.value = l.partner; o.textContent = l.partner + ' (not in list)'; sel.appendChild(o); }
+    sel.value = l.partner;
+    sel.addEventListener('change', () => { current.links[i].partner = sel.value; touch(); });
+    const inp = document.createElement('input'); inp.type = 'number'; inp.min = 0; inp.max = 100; inp.step = 1; inp.id = 'ls-' + i; inp.value = Math.round(l.share * 100); inp.setAttribute('aria-label', 'Export share, percent');
+    inp.addEventListener('input', () => { const v = Number(inp.value); current.links[i].share = isFinite(v) ? Math.max(0, Math.min(100, v)) / 100 : 0; touch(); });
+    const rm = document.createElement('button'); rm.type = 'button'; rm.className = 'btn ghost'; rm.textContent = 'Remove';
+    rm.addEventListener('click', () => { current.links.splice(i, 1); buildLinks(); touch(); });
+    row.append(sel, inp, rm); box.appendChild(row);
+  });
+  if (!(current.links || []).length) { const p = document.createElement('p'); p.className = 'fig-note'; p.textContent = 'No trade partners yet. Without them the country imports no spillover.'; box.appendChild(p); }
+}
+
+function render() {
+  const rows = computeAll(universe());
+  const me = rows.find(r => r.c._live) || rows[0];
+  const eff = me.c.eff;
+  // sliders reflect effective values; derived ones are locked in figures mode
+  for (const p of P) {
+    const derived = mode === 'figures' && eff.derived[p.key];
+    const row = $('row-' + p.key), sl = $('s-' + p.key);
+    row.classList.toggle('derived', !!derived); sl.disabled = !!derived;
+    if (derived) sl.value = Math.round(eff.scores[p.key]);
+    $('v-' + p.key).textContent = Number.isInteger(eff.scores[p.key]) ? eff.scores[p.key] : eff.scores[p.key].toFixed(1);
+    const b = current.base ? base.get(current.base) : null;
+    row.classList.toggle('changed', !!(b && !derived && b.scores[p.key] !== current.scores[p.key]));
+  }
+  const dB = mode === 'figures' && eff.derived._buffer, dE = mode === 'figures' && eff.derived._exposure;
+  $('s-buffer').disabled = !!dB; $('row-buffer').classList.toggle('derived', !!dB); if (dB) $('s-buffer').value = Math.round(eff.buffer);
+  $('s-exposure').disabled = !!dE; $('row-exposure').classList.toggle('derived', !!dE); if (dE) $('s-exposure').value = Math.round(eff.exposure * 100);
+  $('v-buffer').textContent = Number.isInteger(eff.buffer) ? eff.buffer : eff.buffer.toFixed(1);
+  $('v-exposure').textContent = Math.round(eff.exposure * 100) + '%';
+  // figure chips
+  for (const ind of IND) {
+    const s = indScore(ind, (current.figures || {})[ind.id]); const el = $('fs-' + ind.id);
+    if (ind.p === '_exposure') { el.textContent = s === null ? '—' : Math.round(s) + '%'; el.classList.toggle('on', s !== null); continue; }
+    el.textContent = s === null ? '—' : (ind.yn && ind.p === '_buffer' ? (s ? '≥5' : '—') : s.toFixed(1)); el.classList.toggle('on', s !== null && !(ind.yn && ind.p === '_buffer' && !s));
+  }
+  for (const p of P) { const c = $('fc-' + p.key); const on = eff.derived[p.key]; c.textContent = on ? 'from figures · ' + eff.scores[p.key].toFixed(1) : 'slider · ' + current.scores[p.key]; c.classList.toggle('on', !!on); }
+  const bc = $('fc-_buffer'); bc.textContent = (eff.derived._buffer || eff.derived._exposure) ? 'from figures · ' + eff.buffer.toFixed(1) : 'slider · ' + current.buffer; bc.classList.toggle('on', !!(eff.derived._buffer || eff.derived._exposure));
+
+  // verdict
+  const o = outlook(me.final);
+  $('vName').textContent = me.c.name + (me.c.region ? ' · ' + me.c.region : '');
+  $('vScore').textContent = f2(me.final);
+  const pill = $('vPill'); pill.className = 'pill o-' + OCLS[o]; pill.lastChild.textContent = o;
+  $('vRank').textContent = '#' + me.rank + ' of ' + rows.length + ' for erosion risk' + (me.rank <= 5 ? ' — among the first to erode' : me.rank > rows.length - 4 ? ' — among the best placed' : '');
+  const pos = x => ((Math.max(1, Math.min(10, x)) - 1) / 9 * 100) + '%';
+  $('marker').style.left = pos(me.final);
+  const tk = $('ticks'); tk.textContent = '';
+  for (const r of rows) { if (r === me) continue; const t = document.createElement('div'); t.className = 'tick'; t.style.left = pos(r.final); tk.appendChild(t); }
+  // steps
+  const st = $('steps'); st.textContent = '';
+  const add = (k, v, cls) => { const dt = document.createElement('dt'); dt.textContent = k; const dd = document.createElement('dd'); dd.textContent = v; if (cls) { dt.className = cls; dd.className = cls; } st.append(dt, dd); };
+  add('Weighted average of 14 scores', f2(me.avg));
+  add('Worst acute score: ' + SHORT[me.wp.key], (Number.isInteger(me.worst) ? me.worst : me.worst.toFixed(1)));
+  add('Blend (70% average + 30% worst)', f2(me.blend));
+  add('Shock absorber (buffer ' + me.effBuf.toFixed(1) + ' after crash haircut)', '−' + (me.off * 100).toFixed(1) + '%');
+  add('Home-grown index', f2(me.home));
+  add('Imported spillover' + (me.spillSrc ? ', mainly from ' + me.spillSrc : ''), '+' + f2(me.spill));
+  add('Final index', f2(me.final), 'tot');
+  const fl = $('flags'); fl.hidden = !me.lethal.length; fl.textContent = me.lethal.length ? 'Lethal flag: ' + me.lethal.join(', ') + ' scores 8 or more. One such score can break a country on its own.' : '';
+  // drivers
+  const dv = $('drivers'); dv.textContent = '';
+  const parts = P.map(p => ({p, v: eff.scores[p.key] * p.weight})).sort((a, b) => b.v - a.v).slice(0, 6);
+  const mx = 30;
+  for (const d of parts) {
+    const row = document.createElement('div'); row.className = 'drow';
+    const n = document.createElement('div'); n.className = 'dn'; n.textContent = SHORT[d.p.key]; n.title = SHORT[d.p.key];
+    const b = document.createElement('div'); b.className = 'db'; const s = document.createElement('span'); s.style.width = (d.v / mx * 100) + '%'; b.appendChild(s);
+    const v = document.createElement('div'); v.className = 'dv'; v.textContent = (Math.round(d.v * 10) / 10);
+    row.append(n, b, v); dv.appendChild(row);
+  }
+  // ribbon
+  const rb = $('ribbon'); rb.textContent = '';
+  for (const r of rows) {
+    const it = document.createElement('button'); it.type = 'button'; it.className = 'ritem' + (r === me ? ' cur' : '');
+    const k = document.createElement('span'); k.className = 'rk'; k.textContent = r.rank;
+    const n = document.createElement('span'); n.className = 'rn'; n.textContent = r.c.name;
+    if (r.c._mine || r.c._live && current._dirty) { const em = document.createElement('em'); em.textContent = r.c._live && current._dirty ? 'editing' : (r.c.base ? 'your version' : 'yours'); n.appendChild(em); }
+    const bar = document.createElement('span'); bar.className = 'rb'; const s = document.createElement('span'); s.style.width = ((r.final - 1) / 9 * 100) + '%'; s.style.background = OCOL[outlook(r.final)]; bar.appendChild(s);
+    const v = document.createElement('span'); v.className = 'rv'; v.textContent = f2(r.final);
+    it.append(k, n, bar, v);
+    it.setAttribute('aria-label', '#' + r.rank + ' ' + r.c.name + ', ' + f2(r.final) + ', ' + outlook(r.final));
+    it.addEventListener('click', () => { if (r !== me) openByName(r.c.name, r.c._id); });
+    rb.appendChild(it);
+  }
+  // controls
+  $('dirty').hidden = !current._dirty;
+  $('saveBtn').disabled = !canSave || !(current._dirty || current._new);
+  $('saveBtn').title = canSave ? '' : 'Saving needs you to be signed in with edit access';
+  $('resetBtn').hidden = !(current.base && (current._mine || current._dirty));
+  $('delWrap').hidden = !(current._id && !current.base && !current._new);
+  const custom = !current.base;
+  $('nameField').hidden = !custom; $('blocField').hidden = !custom; $('regionField').hidden = !custom;
+}
+
+function touch() { current._dirty = true; render(); }
+
+/* ---------- selection ---------- */
+function buildSelect() {
+  const sel = $('country'); const keep = sel.value; sel.textContent = '';
+  const g1 = document.createElement('optgroup'); g1.label = 'Model countries';
+  for (const b of [...MODEL.countries].sort((a, b) => a.name.localeCompare(b.name))) { const o = document.createElement('option'); o.value = 'b:' + b.name; o.textContent = b.name + (saved.has('base-' + slug(b.name)) ? ' (your version)' : ''); g1.appendChild(o); }
+  sel.appendChild(g1);
+  const mine = [...saved].filter(([, s]) => !s.base);
+  if (mine.length || (current && current._new)) {
+    const g2 = document.createElement('optgroup'); g2.label = 'Your countries';
+    for (const [id, s] of mine.sort((a, b) => a[1].name.localeCompare(b[1].name))) { const o = document.createElement('option'); o.value = 'c:' + id; o.textContent = s.name; g2.appendChild(o); }
+    if (current && current._new) { const o = document.createElement('option'); o.value = 'new'; o.textContent = (current.name || 'New country') + ' (not saved)'; g2.appendChild(o); }
+    sel.appendChild(g2);
+  }
+  if (current) sel.value = current._new ? 'new' : current.base ? 'b:' + current.base : 'c:' + current._id; else if (keep) sel.value = keep;
+}
+
+function openBase(name) {
+  const b = base.get(name); const sv = saved.get('base-' + slug(name));
+  current = Object.assign(clone(b), sv ? clone(sv) : {}, {name, base: name, _mine: !!sv, _dirty: false});
+  current.figures = current.figures || {}; mode = current.mode || 'scores';
+  afterOpen();
+}
+function openCustom(id) {
+  const sv = saved.get(id); if (!sv) return;
+  current = Object.assign(clone(sv), {_id: id, _mine: true, _dirty: false}); current.figures = current.figures || {}; mode = current.mode || 'scores';
+  afterOpen();
+}
+function openByName(name, id) { if (id) openCustom(id); else if (base.has(name)) openBase(name); }
+function afterOpen() { setMode(mode, true); fillInputs(); buildSelect(); render(); }
+
+function newCountry() {
+  const n = 'New country';
+  current = {name: n, region: '', bloc: 'South', base: null, _new: true, _dirty: true, mode: 'figures',
+    scores: Object.fromEntries(P.map(p => [p.key, 5])), buffer: 3, exposure: 0, figures: {}, links: []};
+  mode = 'figures'; afterOpen(); $('cname').focus(); $('cname').select();
+}
+
+function setMode(m, quiet) {
+  mode = m; if (current) current.mode = m;
+  $('tab-scores').setAttribute('aria-selected', String(m === 'scores'));
+  $('tab-figures').setAttribute('aria-selected', String(m === 'figures'));
+  $('figures').hidden = m !== 'figures';
+  $('modeHelp').textContent = m === 'scores' ? 'Drag each slider from 1 (robust) to 10 (critical erosion).' : 'Enter the figures you have. They set the scores below; anything left blank keeps its slider.';
+  if (!quiet && current) touch();
+}
+
+/* ---------- saving ---------- */
+function setStatus(kind, text) { const s = $('status'); s.className = 'status ' + kind; s.lastChild.textContent = text; }
+function record() {
+  const r = {name: current.name.trim() || 'Unnamed', region: current.region || '', bloc: current.bloc || 'South', base: current.base || null,
+    mode, scores: current.scores, buffer: current.buffer, exposure: current.exposure, figures: current.figures || {}, links: current.links || [], savedAt: new Date().toISOString()};
+  return JSON.parse(JSON.stringify(r));
+}
+async function save() {
+  if (!col) return;
+  const id = current.base ? 'base-' + slug(current.base) : (current._id || ('c-' + slug(current.name) + '-' + Math.random().toString(36).slice(2, 7)));
+  $('saveBtn').disabled = true; setStatus('', 'Saving…');
+  try {
+    await col.doc(id).set(record());
+    current._id = current.base ? undefined : id; current._new = false; current._dirty = false; current._mine = true;
+    setStatus('ok', 'Saved to your account');
+  } catch (e) {
+    setStatus('warn', e && e.code === 'quota_exceeded' ? 'Storage is full. Delete a saved country, then save again.' : 'Could not save. Check that you are signed in, then try Save again.');
+  }
+  buildSelect(); render();
+}
+async function resetBase() {
+  const id = 'base-' + slug(current.base);
+  if (saved.has(id) && col) { try { await col.doc(id).delete(); } catch (e) { setStatus('warn', 'Could not reset. Try again.'); return; } }
+  saved.delete(id); openBase(current.base); setStatus('ok', 'Back to the model values');
+}
+async function del() {
+  if (!col || !current._id) return;
+  try { await col.doc(current._id).delete(); saved.delete(current._id); setStatus('ok', 'Deleted'); openBase('Australia'); }
+  catch (e) { setStatus('warn', 'Could not delete. Try again.'); }
+}
+
+/* ---------- wiring ---------- */
+buildSliders(); buildFigures();
+$('country').addEventListener('change', e => { const v = e.target.value; if (v.startsWith('b:')) openBase(v.slice(2)); else if (v.startsWith('c:')) openCustom(v.slice(2)); });
+$('newBtn').addEventListener('click', newCountry);
+$('tab-scores').addEventListener('click', () => setMode('scores'));
+$('tab-figures').addEventListener('click', () => setMode('figures'));
+$('cname').addEventListener('input', e => { current.name = e.target.value; buildSelect(); touch(); });
+$('cbloc').addEventListener('change', e => { current.bloc = e.target.value; touch(); });
+$('cregion').addEventListener('input', e => { current.region = e.target.value; touch(); });
+$('addLink').addEventListener('click', () => { const names = universe().map(r => r.name).filter(n => n !== current.name && !(current.links || []).some(l => l.partner === n)).sort(); if (!names.length) return; current.links = current.links || []; current.links.push({partner: names.includes('China') ? 'China' : names[0], share: 0.1}); buildLinks(); touch(); });
+$('saveBtn').addEventListener('click', save);
+$('resetBtn').addEventListener('click', resetBase);
+$('delBtn').addEventListener('click', () => { $('delConfirm').hidden = false; $('delBtn').hidden = true; });
+$('delNo').addEventListener('click', () => { $('delConfirm').hidden = true; $('delBtn').hidden = false; });
+$('delYes').addEventListener('click', () => { $('delConfirm').hidden = true; $('delBtn').hidden = false; del(); });
+
+openBase('Australia');
+setStatus('', 'Connecting to your saved countries…');
+
+(async () => {
+  let db = null, user = null, uid = null;
+  try { db = await window.claude?.use?.('db'); user = await window.claude?.use?.('user'); uid = user ? await user.id() : null; } catch (e) {}
+  if (!db || !uid) { canSave = false; setStatus('warn', 'Saving is off here. You can still score countries; changes last until you leave.'); render(); return; }
+  col = db.doc('data/users/' + uid + '/workspace').collection('countries'); canSave = true;
+  setStatus('ok', 'Your saved countries are private to you');
+  col.onSnapshot(snap => {
+    const m = new Map(); for (const d of snap.docs) if (d.exists) m.set(d.id, d.data());
+    saved = m; buildSelect();
+    if (current && !current._dirty) { if (current.base) openBase(current.base); else if (current._id && saved.has(current._id)) openCustom(current._id); else render(); } else render();
+  }, () => { canSave = false; col = null; setStatus('warn', 'Lost the connection to your saved countries. Reload to try again.'); render(); });
+  render();
+})();
+</script>
+
+</body>
+</html>
