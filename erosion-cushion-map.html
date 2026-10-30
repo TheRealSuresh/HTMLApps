@@ -1,0 +1,357 @@
+<title>Erosion and Cushion Map</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+<style>
+/* Layout: one wide quadrant map with the reading key beside it, then the four quadrant rosters underneath. */
+:root {
+  --bg: #f4f5f3; --panel: #ffffff; --ink: #18201f; --muted: #5d6865; --line: #d9ddd9; --soft: #eceeeb;
+  --accent: #1f5f5b; --grid: #e3e6e2; --axis: #9aa39f;
+  --succeeds: #2f7d5b; --muddles: #8a8a6e; --risk: #c27a12; --erodes: #b23a2b;
+  --q-fort: #e3eee8; --q-crack: #f4ead6; --q-unins: #ecedf0; --q-exposed: #f4e0dc;
+  --display: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --body: "IBM Plex Sans", -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  --r: 6px;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #121615; --panel: #1a201f; --ink: #e6ebe9; --muted: #9aa7a3; --line: #2e3836; --soft: #232b29;
+  --accent: #6fb8b1; --grid: #263130; --axis: #5f6c69;
+  --succeeds: #6cc49a; --muddles: #b4b495; --risk: #e8a74a; --erodes: #ef7f6f;
+  --q-fort: #18291f; --q-crack: #2e2717; --q-unins: #1e2226; --q-exposed: #321c19; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #121615; --panel: #1a201f; --ink: #e6ebe9; --muted: #9aa7a3; --line: #2e3836; --soft: #232b29;
+  --accent: #6fb8b1; --grid: #263130; --axis: #5f6c69;
+  --succeeds: #6cc49a; --muddles: #b4b495; --risk: #e8a74a; --erodes: #ef7f6f;
+  --q-fort: #18291f; --q-crack: #2e2717; --q-unins: #1e2226; --q-exposed: #321c19; color-scheme: dark; }
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 16px; line-height: 1.55; margin: 0; }
+.wrap { max-width: 76rem; margin: 0 auto; padding-block: 28px 56px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 28px; }
+h1, h2, h3 { margin: 0; text-wrap: balance; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.eyebrow { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.hero { display: flex; flex-direction: column; gap: 10px; padding-bottom: 4px; }
+.hero h1 { font-family: var(--display); font-weight: 600; font-size: clamp(30px, 4.4vw, 44px); letter-spacing: -.015em; line-height: 1.1; }
+.hero .lede { margin: 0; font-size: clamp(17px, 1.6vw, 19px); max-width: 60ch; color: var(--ink); }
+.hero .lede-sub { margin: 0; color: var(--muted); max-width: 62ch; }
+.controls { z-index: 5; display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; justify-content: space-between; padding: 10px 0; background: color-mix(in srgb, var(--bg) 92%, transparent); backdrop-filter: blur(6px); border-bottom: 1px solid var(--line); }
+.controls .jump { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13.5px; }
+.controls .jump a { color: var(--muted); text-decoration: none; }
+.controls .jump a:hover { color: var(--ink); text-decoration: underline; }
+.controls .right { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; background: var(--panel); }
+.seg button { border: 0; background: transparent; padding: 6px 11px; cursor: pointer; font: inherit; font-size: 13.5px; color: var(--muted); font-weight: 500; }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+.tog { display: inline-flex; align-items: center; gap: 8px; font-size: 13.5px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 6px 11px; cursor: pointer; }
+.tog input { accent-color: var(--accent); width: 16px; height: 16px; margin: 0; }
+/* story sections: visual beside text, alternating sides */
+.story { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); gap: 24px 36px; align-items: center; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 24px; scroll-margin-top: 64px; }
+.story.flip { grid-template-columns: minmax(0, 1fr) minmax(0, 1.45fr); }
+.story.flip .viz { order: 2; }
+@media (max-width: 900px) { .story, .story.flip { grid-template-columns: minmax(0, 1fr); padding: 18px 16px; } .story .viz, .story.flip .viz { order: 2; } }
+.viz { min-width: 0; }
+.text { min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+.text .num { font-family: var(--mono); font-size: 12px; color: var(--muted); letter-spacing: .04em; }
+.text h2 { font-family: var(--display); font-weight: 600; font-size: clamp(24px, 2.6vw, 30px); letter-spacing: -.01em; line-height: 1.15; }
+.text .tag { display: inline-block; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; padding: 3px 9px; border-radius: 999px; align-self: flex-start; }
+.text p { margin: 0; }
+.text .big { font-size: 17.5px; }
+.text .m { color: var(--muted); font-size: 14.5px; }
+.analogy { border-left: 3px solid var(--accent); padding: 4px 0 4px 12px; font-style: italic; color: var(--ink); }
+.facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.fact { background: var(--bg); border-radius: var(--r); padding: 10px 12px; min-width: 0; }
+.fact .k { font-size: 12px; color: var(--muted); }
+.fact .v { font-family: var(--display); font-size: 20px; font-weight: 600; line-height: 1.2; overflow-wrap: anywhere; }
+.fact .s { font-size: 12.5px; color: var(--muted); }
+.chips { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 5px 6px; }
+.chips li { font-size: 13px; background: var(--bg); border: 1px solid var(--line); border-radius: 999px; padding: 2px 9px; display: inline-flex; align-items: center; gap: 5px; cursor: default; }
+.chips li i { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+.read { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.read li { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 10px; align-items: start; }
+.read .ic { width: 30px; height: 30px; border-radius: 50%; background: var(--bg); border: 1px solid var(--line); display: grid; place-items: center; font-family: var(--mono); font-size: 13px; color: var(--ink); }
+.read b { font-weight: 600; }
+.swatches { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 4px; font-size: 13.5px; }
+.swatches span { display: inline-flex; align-items: center; gap: 6px; }
+.swatches i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex: none; }
+.sizes { display: flex; align-items: flex-end; gap: 14px; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
+.chartbox { position: relative; overflow-x: auto; }
+.chartbox svg { display: block; width: 100%; min-width: 30rem; height: auto; font-family: var(--body); }
+.hint { font-size: 12.5px; color: var(--muted); margin-top: 6px; }
+.hint .narrow { display: none; }
+@media (max-width: 560px) { .hint .narrow { display: inline; } }
+.tip { position: absolute; pointer-events: none; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); box-shadow: 0 6px 20px rgba(0,0,0,.14); padding: 8px 10px; font-size: 12.5px; line-height: 1.45; max-width: 17rem; z-index: 3; }
+.tip b { font-weight: 600; } .tip .m { color: var(--muted); }
+.tip dl { display: grid; grid-template-columns: auto auto; gap: 2px 12px; margin: 6px 0 0; }
+.tip dd { margin: 0; text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.q-fort-t { background: var(--q-fort); color: var(--succeeds); } .q-crack-t { background: var(--q-crack); color: var(--risk); }
+.q-unins-t { background: var(--q-unins); color: var(--muted); } .q-exposed-t { background: var(--q-exposed); color: var(--erodes); }
+/* closing section */
+.factors { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.45fr); gap: 24px 36px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 24px; scroll-margin-top: 64px; }
+@media (max-width: 900px) { .factors { grid-template-columns: minmax(0, 1fr); padding: 18px 16px; } }
+.qs { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; }
+.qs b { font-weight: 600; }
+.pillars { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 520px) { .pillars { grid-template-columns: minmax(0, 1fr); } }
+.pillar { border: 1px solid var(--line); border-radius: var(--r); padding: 10px 12px; background: var(--bg); }
+.pillar h3 { font-size: 13.5px; font-weight: 600; margin: 0 0 4px; }
+.pillar ul { list-style: none; margin: 0; padding: 0; font-size: 13.5px; }
+.pillar li { display: flex; justify-content: space-between; gap: 8px; padding: 1px 0; }
+.pillar li span:last-child { font-family: var(--mono); font-size: 12px; color: var(--muted); flex: none; }
+.pillar li.l span:last-child { color: var(--erodes); font-weight: 500; }
+.foot { font-size: 12.5px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 16px; }
+.foot p { margin: 0 0 6px; max-width: 90ch; }
+@media (min-width: 700px) { .controls { position: sticky; top: 0; } }
+@media (prefers-reduced-motion: no-preference) { .bub { transition: opacity .15s; } html { scroll-behavior: smooth; } }
+</style>
+
+<div class="wrap">
+  <header class="hero">
+    <div class="eyebrow">National Erosion Index · model v8 · 42 countries · a hobby model</div>
+    <h1>Who can weather the next ten years?</h1>
+    <p class="lede">Some countries have serious problems building at home. Some have a deep pool of money to fall back on. This map puts the two side by side, so you can see which economies are best placed for a turbulent decade and which are likely to erode first.</p>
+    <p class="lede-sub">Scroll through the five sections: the big picture first, then each of the four groups the map divides countries into.</p>
+  </header>
+
+  <nav class="controls" aria-label="Sections and view options">
+    <div class="jump"><a href="#s-all">Big picture</a><a href="#s-fort">Fortresses</a><a href="#s-crack">Cushioned but cracking</a><a href="#s-unins">Sound but uninsured</a><a href="#s-exposed">Exposed</a><a href="#s-factors">What's in the scores</a></div>
+    <div class="right">
+      <div class="seg" role="group" aria-label="Show countries">
+        <button type="button" data-f="All" aria-pressed="true">All 42</button>
+        <button type="button" data-f="North" aria-pressed="false">Global North</button>
+        <button type="button" data-f="South" aria-pressed="false">Global South</button>
+      </div>
+      <label class="tog"><input type="checkbox" id="ext"> Count stockpiles and pension funds</label>
+    </div>
+  </nav>
+
+  <section class="story" id="s-all" aria-labelledby="h-all">
+    <div class="viz"><div class="chartbox" data-focus="all"><svg role="img" aria-label="Bubble map of countries by problems at home and size of cushion"></svg><div class="tip" hidden></div></div><div class="hint">Hover over or tap a bubble for details.<span class="narrow"> Swipe sideways to see the whole map.</span></div></div>
+    <div class="text">
+      <div class="num">01 · THE BIG PICTURE</div>
+      <h2 id="h-all">Two questions decide how a country weathers a shock</h2>
+      <ol class="read">
+        <li><span class="ic">→</span><div><b>Across: how much is going wrong at home?</b> Debt, inflation, conflict, climate and more, scored from 1 (robust) to 10 (critical). Past the dashed line at 5.5, trouble is serious.</div></li>
+        <li><span class="ic">↑</span><div><b>Up: how big is the safety cushion?</b> Reserves and national savings funds compared with the size of the economy. Above the dashed line at 5, the cushion is deep.</div></li>
+        <li><span class="ic">○</span><div><b>Bubble size: the cushion in dollars.</b> A big bubble low down means a lot of money, but small for that economy.</div></li>
+        <li><span class="ic">●</span><div><b>Colour: the final verdict.</b> It also counts trouble imported from trade partners.
+          <div class="swatches"><span><i style="background:var(--erodes)"></i>Erodes first</span><span><i style="background:var(--risk)"></i>At risk</span><span><i style="background:var(--muddles)"></i>Muddles through</span><span><i style="background:var(--succeeds)"></i>Succeeds</span></div></div></li>
+      </ol>
+      <div class="sizes"><svg class="sizeKey" width="230" height="100" aria-hidden="true" style="max-width:100%"></svg><span class="sizeNote">Cushion: FX reserves plus sovereign wealth funds.</span></div>
+    </div>
+  </section>
+
+  <section class="story flip" id="s-fort" data-q="fort" aria-labelledby="h-fort"></section>
+  <section class="story" id="s-crack" data-q="crack" aria-labelledby="h-crack"></section>
+  <section class="story flip" id="s-unins" data-q="unins" aria-labelledby="h-unins"></section>
+  <section class="story" id="s-exposed" data-q="exposed" aria-labelledby="h-exposed"></section>
+
+  <section class="factors" id="s-factors" aria-labelledby="h-factors">
+    <div class="text">
+      <div class="num">06 · WHAT'S IN THE SCORES</div>
+      <h2 id="h-factors">17 things that can wear an economy down</h2>
+      <p>Each country is judged on three questions:</p>
+      <ol class="qs">
+        <li><b>How much damage is building at home?</b> The 17 factors on the right, each scored 1 to 10. Factors that can do harm fastest count most. One very bad score can't be averaged away, and a borrowing boom that feeds a bubble adds a penalty.</li>
+        <li><b>How much money does it have to absorb a shock?</b> Reserves, sovereign wealth funds and room to borrow, cut by 40% on the part held in markets that could crash at the same time. This can lower the score by up to 25%.</li>
+        <li><b>How much trouble does it import?</b> Problems spill over from trade partners in difficulty and, for euro members, from each other.</li>
+      </ol>
+      <p class="m">Final verdict: 7.0 or more erodes first; 5.5 to 6.99 at risk; 4.0 to 5.49 muddles through; below 4.0 succeeds.</p>
+    </div>
+    <div>
+      <div class="eyebrow" style="margin-bottom:10px">Factors considered · weight ×3 lethal, ×2 serious, ×1 background</div>
+      <div class="pillars">
+        <div class="pillar"><h3>Money &amp; debt</h3><ul><li class="l"><span>Public debt &amp; military vs growth</span><span>×3</span></li><li class="l"><span>Loose money</span><span>×3</span></li><li class="l"><span>External fragility</span><span>×3</span></li><li class=""><span>Asset bubbles</span><span>×2</span></li><li class=""><span>Private debt</span><span>×2</span></li></ul></div>
+        <div class="pillar"><h3>Politics, conflict &amp; society</h3><ul><li class="l"><span>Political instability</span><span>×3</span></li><li class="l"><span>War or conflict</span><span>×3</span></li><li class=""><span>Crime</span><span>×2</span></li><li class=""><span>Health &amp; education</span><span>×1</span></li><li class=""><span>Household formation</span><span>×1</span></li></ul></div>
+        <div class="pillar"><h3>Resources &amp; climate</h3><ul><li class=""><span>Energy, food &amp; medicine</span><span>×2</span></li><li class=""><span>Physical climate risk</span><span>×2</span></li><li class=""><span>Climate transition risk</span><span>×2</span></li><li class=""><span>Pollution</span><span>×1</span></li></ul></div>
+        <div class="pillar"><h3>Trade &amp; technology</h3><ul><li class=""><span>Trade weakness</span><span>×2</span></li><li class=""><span>AI disruption exposure</span><span>×2</span></li><li class=""><span>AI capability gap</span><span>×2</span></li></ul></div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="foot">
+    <p>Scores as of 18 Oct 2026, from IMF, World Bank, BIS and other published data plus the author's judgement. A hobby model built with the help of AI. Not investment advice.</p>
+    <p><b>"Count stockpiles and pension funds"</b> adds government oil, grain and other strategic stockpiles at full value, and 25% of public pension and social-security reserve funds (the rest is owed to retirees), with the same 40% crash cut on the half held in shares. It raises the cushion by up to 2 points.</p>
+    <p>Dollar cushion sizes are approximate 2025-26 estimates of FX reserves plus major sovereign wealth funds. Russia counts only reserves it can still reach. Argentina is gross reserves (its net reserves are negative). The United States holds a small cushion but issues the world's main reserve currency, which the model credits separately.</p>
+  </footer>
+</div>
+
+<script>
+const ALL = {"off": [{"name": "Iran", "region": "Middle East", "bloc": "South", "blend": 7.861, "eff": 2.0, "off": 0.028, "home": 7.643, "bonus": 0, "usd": 30, "base_usd": 30, "stock": 0.0, "near": 0.0, "extnote": "Nothing reachable", "note": "National Development Fund drawn down; reserves largely frozen", "worst": "Loose money / excessive debt creation", "buffer": 2.0, "exposure": 0.0, "final": 8.2, "rank": 1, "amp": 0}, {"name": "DR Congo", "region": "Africa", "bloc": "South", "blend": 7.142, "eff": 1.0, "off": 0.0, "home": 7.142, "bonus": 0, "usd": 7, "base_usd": 7, "stock": 0.0, "near": 0.0, "extnote": "None", "note": "Minimal reserves; IMF programme", "worst": "AI capability gap (chips, compute, talent, investment; weak = high)", "buffer": 1.0, "exposure": 0.0, "final": 7.707, "rank": 2, "amp": 0}, {"name": "Ukraine", "region": "Europe", "bloc": "North", "blend": 7.511, "eff": 1.0, "off": 0.0, "home": 7.511, "bonus": 0, "usd": 45, "base_usd": 45, "stock": 0.0, "near": 0.0, "extnote": "None", "note": "Depends on external aid, which is not counted as a buffer", "worst": "Debt & military spending vs growth", "buffer": 1.0, "exposure": 0.0, "final": 7.654, "rank": 3, "amp": 0}, {"name": "Pakistan", "region": "Asia", "bloc": "South", "blend": 7.367, "eff": 1.0, "off": 0.0, "home": 7.367, "bonus": 0, "usd": 20, "base_usd": 20, "stock": 0.0, "near": 0.0, "extnote": "None", "note": "IMF-dependent; reserves cover only a few months of imports", "worst": "Debt & military spending vs growth", "buffer": 1.0, "exposure": 0.0, "final": 7.51, "rank": 4, "amp": 0}, {"name": "Ethiopia", "region": "Africa", "bloc": "South", "blend": 7.192, "eff": 1.0, "off": 0.0, "home": 7.192, "bonus": 0, "usd": 3, "base_usd": 3, "stock": 0.0, "near": 0.0, "extnote": "None", "note": "Restructuring; minimal reserves", "worst": "External fragility (foreign-currency debt, pegs, current-account deficit, IMF dependence)", "buffer": 1.0, "exposure": 0.0, "final": 7.294, "rank": 5, "amp": 0}, {"name": "Nigeria", "region": "Africa", "bloc": "South", "blend": 7.367, "eff": 2.0, "off": 0.028, "home": 7.162, "bonus": 0, "usd": 43, "base_usd": 43, "stock": 0.0, "near": 0.0, "extnote": "None", "note": "Small sovereign fund and thin reserves relative to needs", "worst": "High crime", "buffer": 2.0, "exposure": 0.0, "final": 7.276, "rank": 6, "amp": 0}, {"name": "Egypt", "region": "Africa", "bloc": "South", "blend": 6.919, "eff": 1.0, "off": 0.0, "home": 6.919, "bonus": 0, "usd": 56, "base_usd": 56, "stock": 2.0, "near": 0.0, "extnote": "Strategic wheat reserve of a few months", "note": "Depends on Gulf deposits and IMF support", "worst": "Debt & military spending vs growth", "buffer": 1.0, "exposure": 0.0, "final": 7.09, "rank": 7, "amp": 0}, {"name": "Russia", "region": "Europe", "bloc": "North", "blend": 6.908, "eff": 3.84, "off": 0.079, "home": 6.363, "bonus": 0, "usd": 400, "base_usd": 400, "stock": 0.0, "near": 0.0, "extnote": "Oil producer; National Wealth Fund already counted", "note": "National Wealth Fund drawn down; about half of reserves frozen abroad", "worst": "Active conflict or war", "buffer": 4.0, "exposure": 0.1, "final": 6.845, "rank": 8, "amp": 0}, {"name": "Bangladesh", "region": "Asia", "bloc": "South", "blend": 6.597, "eff": 2.0, "off": 0.028, "home": 6.414, "bonus": 0, "usd": 25, "base_usd": 25, "stock": 1.0, "near": 0.0, "extnote": "Food stocks", "note": "Reserves rebuilt but low", "worst": "Physical climate risk (floods, heat, sea level)", "buffer": 2.0, "exposure": 0.0, "final": 6.501, "rank": 9, "amp": 0}, {"name": "South Africa", "region": "Africa", "bloc": "South", "blend": 6.558, "eff": 2.88, "off": 0.052, "home": 6.216, "bonus": 0, "usd": 65, "base_usd": 65, "stock": 0.0, "near": 150.0, "extnote": "Public Investment Corporation (GEPF)", "note": "Modest reserves; rising debt", "worst": "High crime", "buffer": 3.0, "exposure": 0.1, "final": 6.373, "rank": 10, "amp": 0}, {"name": "Turkey", "region": "Europe/Middle East", "bloc": "South", "blend": 6.075, "eff": 2.0, "off": 0.028, "home": 5.906, "bonus": 0, "usd": 170, "base_usd": 170, "stock": 2.0, "near": 0.0, "extnote": "Small oil stocks", "note": "Thin net reserves after years of drawdown", "worst": "Loose money / excessive debt creation", "buffer": 2.0, "exposure": 0.0, "final": 6.087, "rank": 11, "amp": 0}, {"name": "Philippines", "region": "Asia", "bloc": "South", "blend": 6.383, "eff": 4.0, "off": 0.083, "home": 5.851, "bonus": 0, "usd": 105, "base_usd": 105, "stock": 0.0, "near": 40.0, "extnote": "SSS and GSIS social security funds", "note": "About $105bn FX reserves", "worst": "Physical climate risk (floods, heat, sea level)", "buffer": 4.0, "exposure": 0.0, "final": 6.025, "rank": 12, "amp": 0}, {"name": "Argentina", "region": "South America", "bloc": "South", "blend": 5.589, "eff": 1.0, "off": 0.0, "home": 5.589, "bonus": 0, "usd": 49, "base_usd": 49, "stock": 0.0, "near": 40.0, "extnote": "FGS (ANSES) sustainability fund", "note": "Negative net reserves; IMF-dependent", "worst": "External fragility (foreign-currency debt, pegs, current-account deficit, IMF dependence)", "buffer": 1.0, "exposure": 0.0, "final": 5.789, "rank": 13, "amp": 0}, {"name": "China", "region": "Asia", "bloc": "South", "blend": 6.511, "eff": 6.44, "off": 0.151, "home": 5.527, "bonus": 0, "usd": 4600, "base_usd": 4600, "stock": 132.0, "near": 400.0, "extnote": "State oil stockpiles and very large state grain reserves; National Social Security Fund", "note": "About $3tn FX reserves, mostly bonds; offset by heavy local-government debt", "worst": "Concentrated asset bubbles", "buffer": 7.0, "exposure": 0.2, "final": 5.641, "rank": 14, "amp": 1.0}, {"name": "Mexico", "region": "North America", "bloc": "South", "blend": 6.006, "eff": 3.84, "off": 0.079, "home": 5.532, "bonus": 0, "usd": 240, "base_usd": 240, "stock": 0.0, "near": 0.0, "extnote": "No strategic reserve; pension funds are private", "note": "Reserves plus IMF flexible credit line", "worst": "High crime", "buffer": 4.0, "exposure": 0.1, "final": 5.638, "rank": 15, "amp": 0}, {"name": "Israel", "region": "Middle East", "bloc": "North", "blend": 6.006, "eff": 4.6, "off": 0.1, "home": 5.405, "bonus": 0, "usd": 230, "base_usd": 230, "stock": 1.0, "near": 0.0, "extnote": "Small fuel reserve", "note": "About $200bn+ FX reserves", "worst": "Active conflict or war", "buffer": 5.0, "exposure": 0.2, "final": 5.494, "rank": 16, "amp": 0}, {"name": "Brazil", "region": "South America", "bloc": "South", "blend": 5.453, "eff": 3.84, "off": 0.079, "home": 5.023, "bonus": 0, "usd": 350, "base_usd": 350, "stock": 0.0, "near": 100.0, "extnote": "FGTS workers' fund under state control", "note": "About $350bn FX reserves; high public debt limits fiscal room", "worst": "High crime", "buffer": 4.0, "exposure": 0.1, "final": 5.358, "rank": 17, "amp": 0}, {"name": "Saudi Arabia", "region": "Middle East", "bloc": "South", "blend": 5.772, "eff": 5.88, "off": 0.136, "home": 4.99, "bonus": 0, "usd": 1375, "base_usd": 1375, "stock": 0.0, "near": 250.0, "extnote": "GOSI social insurance fund", "note": "Central bank reserves plus PIF, but much of PIF is domestic and illiquid", "worst": "Climate transition risk (fossil-fuel & carbon-heavy dependence)", "buffer": 7.0, "exposure": 0.4, "final": 5.208, "rank": 18, "amp": 0}, {"name": "India", "region": "Asia", "bloc": "South", "blend": 5.744, "eff": 4.8, "off": 0.106, "home": 5.138, "bonus": 0, "usd": 700, "base_usd": 700, "stock": 28.0, "near": 300.0, "extnote": "39m-barrel SPR and FCI grain stocks; EPFO provident fund", "note": "About $650-700bn FX reserves", "worst": "Physical climate risk (floods, heat, sea level)", "buffer": 5.0, "exposure": 0.1, "final": 5.205, "rank": 19, "amp": 0}, {"name": "Vietnam", "region": "Asia", "bloc": "South", "blend": 5.2, "eff": 2.88, "off": 0.052, "home": 4.928, "bonus": 0, "usd": 85, "base_usd": 85, "stock": 2.0, "near": 40.0, "extnote": "Rice and oil reserves; Vietnam Social Security fund", "note": "Modest reserves; low public debt", "worst": "Physical climate risk (floods, heat, sea level)", "buffer": 3.0, "exposure": 0.1, "final": 5.152, "rank": 20, "amp": 0}, {"name": "Italy", "region": "Europe", "bloc": "North", "blend": 5.317, "eff": 3.0, "off": 0.056, "home": 5.021, "bonus": 0, "usd": 300, "base_usd": 300, "stock": 6.0, "near": 0.0, "extnote": "OCSIT oil stocks", "note": "Large gold reserves but high debt; relies on the ECB backstop", "worst": "Debt & military spending vs growth", "buffer": 3.0, "exposure": 0.0, "final": 5.149, "rank": 21, "amp": 0}, {"name": "Thailand", "region": "Asia", "bloc": "South", "blend": 5.542, "eff": 4.9, "off": 0.108, "home": 4.941, "bonus": 0, "usd": 260, "base_usd": 260, "stock": 3.0, "near": 40.0, "extnote": "Oil reserve; Government Pension Fund", "note": "FX reserves near 45% of GDP", "worst": "Political instability", "buffer": 5.0, "exposure": 0.05, "final": 5.12, "rank": 22, "amp": 0}, {"name": "Australia", "region": "Oceania", "bloc": "North", "blend": 5.142, "eff": 4.0, "off": 0.083, "home": 4.713, "bonus": 0, "usd": 225, "base_usd": 225, "stock": 2.0, "near": 0.0, "extnote": "Small fuel stocks; Future Fund already counted", "note": "Future Fund and moderate public debt; floating currency", "worst": "Concentrated asset bubbles", "buffer": 5.0, "exposure": 0.5, "final": 5.088, "rank": 23, "amp": 0}, {"name": "United Kingdom", "region": "Europe", "bloc": "North", "blend": 5.231, "eff": 3.0, "off": 0.056, "home": 4.94, "bonus": 0, "usd": 180, "base_usd": 180, "stock": 8.0, "near": 0.0, "extnote": "Compulsory oil stocks held by industry", "note": "No fund; high debt and gilt-market sensitivity", "worst": "Debt & military spending vs growth", "buffer": 3.0, "exposure": 0.0, "final": 5.03, "rank": 24, "amp": 0}, {"name": "South Korea", "region": "Asia", "bloc": "North", "blend": 5.181, "eff": 4.4, "off": 0.094, "home": 4.691, "bonus": 0, "usd": 610, "base_usd": 610, "stock": 7.0, "near": 900.0, "extnote": "KNOC strategic oil reserve; National Pension Service", "note": "About $400bn FX reserves; moderate public debt", "worst": "Energy, food & medicine security", "buffer": 5.0, "exposure": 0.3, "final": 4.921, "rank": 25, "amp": 0}, {"name": "United States", "region": "North America", "bloc": "North", "blend": 5.192, "eff": 5.0, "off": 0.111, "home": 4.615, "bonus": 0, "usd": 250, "base_usd": 250, "stock": 29.0, "near": 0.0, "extnote": "Strategic Petroleum Reserve ~410m barrels; Social Security trust fund is non-marketable, so not counted", "note": "No fund, but dollar reserve status lets it borrow in a crisis", "worst": "Debt & military spending vs growth", "buffer": 5.0, "exposure": 0.0, "final": 4.878, "rank": 26, "amp": 0}, {"name": "Indonesia", "region": "Asia", "bloc": "South", "blend": 4.9, "eff": 3.84, "off": 0.079, "home": 4.513, "bonus": 0, "usd": 160, "base_usd": 160, "stock": 2.0, "near": 40.0, "extnote": "Bulog rice stocks; BPJS social security funds", "note": "Adequate FX reserves; low debt", "worst": "Physical climate risk (floods, heat, sea level)", "buffer": 4.0, "exposure": 0.1, "final": 4.866, "rank": 27, "amp": 0}, {"name": "France", "region": "Europe", "bloc": "North", "blend": 4.958, "eff": 3.0, "off": 0.056, "home": 4.683, "bonus": 0, "usd": 270, "base_usd": 270, "stock": 8.0, "near": 22.0, "extnote": "SAGESS oil stocks; Fonds de réserve pour les retraites", "note": "No fund; high debt; relies on the ECB backstop", "worst": "Debt & military spending vs growth", "buffer": 3.0, "exposure": 0.0, "final": 4.817, "rank": 28, "amp": 0}, {"name": "Qatar", "region": "Middle East", "bloc": "South", "blend": 5.461, "eff": 7.6, "off": 0.183, "home": 4.46, "bonus": 0, "usd": 600, "base_usd": 600, "stock": 1.0, "near": 0.0, "extnote": "Food stockpile; QIA already counted", "note": "Qatar Investment Authority, roughly twice GDP", "worst": "Climate transition risk (fossil-fuel & carbon-heavy dependence)", "buffer": 10.0, "exposure": 0.6, "final": 4.796, "rank": 29, "amp": 0}, {"name": "Japan", "region": "Asia", "bloc": "North", "blend": 5.2, "eff": 5.28, "off": 0.119, "home": 4.582, "bonus": 0, "usd": 1250, "base_usd": 1250, "stock": 34.0, "near": 1700.0, "extnote": "About 470m barrels of oil stocks; GPIF public pension fund", "note": "About $1.2tn FX reserves and large net foreign assets; gross public debt very high", "worst": "Debt & military spending vs growth", "buffer": 6.0, "exposure": 0.3, "final": 4.783, "rank": 30, "amp": 0}, {"name": "Canada", "region": "North America", "bloc": "North", "blend": 4.967, "eff": 3.68, "off": 0.074, "home": 4.597, "bonus": 0, "usd": 120, "base_usd": 120, "stock": 0.0, "near": 500.0, "extnote": "No strategic oil reserve; Canada Pension Plan Investments", "note": "Moderate federal debt; pension funds are not government buffers", "worst": "Concentrated asset bubbles", "buffer": 4.0, "exposure": 0.2, "final": 4.729, "rank": 31, "amp": 0}, {"name": "Chile", "region": "South America", "bloc": "South", "blend": 4.503, "eff": 3.36, "off": 0.066, "home": 4.208, "bonus": 0, "usd": 65, "base_usd": 65, "stock": 0.0, "near": 0.0, "extnote": "Sovereign funds already counted; pensions are private", "note": "Sovereign stabilisation funds and moderate reserves", "worst": "Trade viability (weak = high score)", "buffer": 4.0, "exposure": 0.4, "final": 4.64, "rank": 32, "amp": 0}, {"name": "Taiwan", "region": "Asia", "bloc": "North", "blend": 5.025, "eff": 6.16, "off": 0.143, "home": 4.305, "bonus": 0, "usd": 590, "base_usd": 590, "stock": 6.0, "near": 250.0, "extnote": "Oil stocks (~90 days); public labour pension fund", "note": "About $590bn FX reserves, roughly 70% of GDP", "worst": "Energy, food & medicine security", "buffer": 7.0, "exposure": 0.3, "final": 4.637, "rank": 33, "amp": 0}, {"name": "United Arab Emirates", "region": "Middle East", "bloc": "South", "blend": 4.986, "eff": 6.84, "off": 0.162, "home": 4.177, "bonus": 0, "usd": 2100, "base_usd": 2100, "stock": 0.0, "near": 0.0, "extnote": "Sovereign funds already counted", "note": "ADIA, Mubadala and other funds well above GDP; large equity share", "worst": "Physical climate risk (floods, heat, sea level)", "buffer": 9.0, "exposure": 0.6, "final": 4.442, "rank": 34, "amp": 0}, {"name": "Poland", "region": "Europe", "bloc": "North", "blend": 4.6, "eff": 3.84, "off": 0.079, "home": 4.237, "bonus": 0, "usd": 250, "base_usd": 250, "stock": 3.0, "near": 5.0, "extnote": "Oil and gas stocks; Demographic Reserve Fund", "note": "Adequate reserves; widening deficit from defence", "worst": "AI disruption exposure (jobs and exports AI can substitute)", "buffer": 4.0, "exposure": 0.1, "final": 4.291, "rank": 35, "amp": 0}, {"name": "New Zealand", "region": "Oceania", "bloc": "North", "blend": 4.269, "eff": 3.36, "off": 0.066, "home": 3.99, "bonus": 0, "usd": 65, "base_usd": 65, "stock": 0.0, "near": 0.0, "extnote": "NZ Super Fund already counted", "note": "NZ Super Fund and low-moderate debt", "worst": "Concentrated asset bubbles", "buffer": 4.0, "exposure": 0.4, "final": 4.271, "rank": 36, "amp": 0}, {"name": "Netherlands", "region": "Europe", "bloc": "North", "blend": 4.531, "eff": 3.84, "off": 0.079, "home": 4.173, "bonus": 0, "usd": 80, "base_usd": 80, "stock": 5.0, "near": 0.0, "extnote": "COVA oil stocks; ABP is an occupational fund, not state", "note": "Low public debt gives fiscal room; pension assets are private", "worst": "Concentrated asset bubbles", "buffer": 4.0, "exposure": 0.1, "final": 4.267, "rank": 37, "amp": 0}, {"name": "Germany", "region": "Europe", "bloc": "North", "blend": 4.647, "eff": 5.76, "off": 0.132, "home": 4.033, "bonus": 0, "usd": 300, "base_usd": 300, "stock": 13.0, "near": 26.0, "extnote": "EBV oil stocks (~90 days); KENFO nuclear fund", "note": "Low debt and euro membership give fiscal space; little sovereign fund", "worst": "Energy, food & medicine security", "buffer": 6.0, "exposure": 0.1, "final": 4.187, "rank": 38, "amp": 0}, {"name": "Malaysia", "region": "Asia", "bloc": "South", "blend": 4.028, "eff": 3.68, "off": 0.074, "home": 3.728, "bonus": 0, "usd": 150, "base_usd": 150, "stock": 0.0, "near": 270.0, "extnote": "Employees Provident Fund", "note": "About $120bn reserves plus Khazanah", "worst": "Physical climate risk (floods, heat, sea level)", "buffer": 4.0, "exposure": 0.2, "final": 3.936, "rank": 39, "amp": 0}, {"name": "Singapore", "region": "Asia", "bloc": "North", "blend": 4.006, "eff": 6.84, "off": 0.162, "home": 3.356, "bonus": 0, "usd": 1480, "base_usd": 1480, "stock": 1.0, "near": 0.0, "extnote": "Rice stockpile; CPF is invested in government bonds, so not counted", "note": "GIC, Temasek and MAS reserves well above GDP; large equity share", "worst": "Energy, food & medicine security", "buffer": 9.0, "exposure": 0.6, "final": 3.502, "rank": 40, "amp": 0}, {"name": "Norway", "region": "Europe", "bloc": "North", "blend": 3.733, "eff": 7.12, "off": 0.17, "home": 3.099, "bonus": 0, "usd": 2470, "base_usd": 2470, "stock": 0.0, "near": 30.0, "extnote": "Government Pension Fund Norway (domestic)", "note": "Oil fund ~NOK 22.7tn ($2.39tn), roughly 4-5x GDP; 72% equities", "worst": "Climate transition risk (fossil-fuel & carbon-heavy dependence)", "buffer": 10.0, "exposure": 0.72, "final": 3.181, "rank": 41, "amp": 0}, {"name": "Switzerland", "region": "Europe", "bloc": "North", "blend": 3.589, "eff": 8.1, "off": 0.197, "home": 2.881, "bonus": 0, "usd": 900, "base_usd": 900, "stock": 4.0, "near": 45.0, "extnote": "Compulsory stocks of fuel, food and medicines; AHV/AVS compensation fund", "note": "Central-bank reserves above 100% of GDP, about a quarter in equities", "worst": "Private debt (household & corporate level and credit growth)", "buffer": 9.0, "exposure": 0.25, "final": 2.99, "rank": 42, "amp": 0}], "on": [{"name": "Iran", "region": "Middle East", "bloc": "South", "blend": 7.861, "eff": 2.0, "off": 0.028, "home": 7.643, "bonus": 0.0, "usd": 30, "base_usd": 30, "stock": 0.0, "near": 0.0, "extnote": "Nothing reachable", "note": "National Development Fund drawn down; reserves largely frozen", "worst": "Loose money / excessive debt creation", "buffer": 2.0, "exposure": 0.0, "final": 8.197, "rank": 1, "amp": 0}, {"name": "DR Congo", "region": "Africa", "bloc": "South", "blend": 7.142, "eff": 1.0, "off": 0.0, "home": 7.142, "bonus": 0.0, "usd": 7, "base_usd": 7, "stock": 0.0, "near": 0.0, "extnote": "None", "note": "Minimal reserves; IMF programme", "worst": "AI capability gap (chips, compute, talent, investment; weak = high)", "buffer": 1.0, "exposure": 0.0, "final": 7.702, "rank": 2, "amp": 0}, {"name": "Ukraine", "region": "Europe", "bloc": "North", "blend": 7.511, "eff": 1.0, "off": 0.0, "home": 7.511, "bonus": 0.0, "usd": 45, "base_usd": 45, "stock": 0.0, "near": 0.0, "extnote": "None", "note": "Depends on external aid, which is not counted as a buffer", "worst": "Debt & military spending vs growth", "buffer": 1.0, "exposure": 0.0, "final": 7.653, "rank": 3, "amp": 0}, {"name": "Pakistan", "region": "Asia", "bloc": "South", "blend": 7.367, "eff": 1.0, "off": 0.0, "home": 7.367, "bonus": 0.0, "usd": 20, "base_usd": 20, "stock": 0.0, "near": 0.0, "extnote": "None", "note": "IMF-dependent; reserves cover only a few months of imports", "worst": "Debt & military spending vs growth", "buffer": 1.0, "exposure": 0.0, "final": 7.509, "rank": 4, "amp": 0}, {"name": "Ethiopia", "region": "Africa", "bloc": "South", "blend": 7.192, "eff": 1.0, "off": 0.0, "home": 7.192, "bonus": 0.0, "usd": 3, "base_usd": 3, "stock": 0.0, "near": 0.0, "extnote": "None", "note": "Restructuring; minimal reserves", "worst": "External fragility (foreign-currency debt, pegs, current-account deficit, IMF dependence)", "buffer": 1.0, "exposure": 0.0, "final": 7.291, "rank": 5, "amp": 0}, {"name": "Nigeria", "region": "Africa", "bloc": "South", "blend": 7.367, "eff": 2.0, "off": 0.028, "home": 7.162, "bonus": 0.0, "usd": 43, "base_usd": 43, "stock": 0.0, "near": 0.0, "extnote": "None", "note": "Small sovereign fund and thin reserves relative to needs", "worst": "High crime", "buffer": 2.0, "exposure": 0.0, "final": 7.274, "rank": 6, "amp": 0}, {"name": "Egypt", "region": "Africa", "bloc": "South", "blend": 6.919, "eff": 1.023, "off": 0.001, "home": 6.915, "bonus": 0.023, "usd": 58, "base_usd": 56, "stock": 2.0, "near": 0.0, "extnote": "Strategic wheat reserve of a few months", "note": "Depends on Gulf deposits and IMF support", "worst": "Debt & military spending vs growth", "buffer": 1.0, "exposure": 0.0, "final": 7.084, "rank": 7, "amp": 0}, {"name": "Russia", "region": "Europe", "bloc": "North", "blend": 6.908, "eff": 3.84, "off": 0.079, "home": 6.363, "bonus": 0.0, "usd": 400, "base_usd": 400, "stock": 0.0, "near": 0.0, "extnote": "Oil producer; National Wealth Fund already counted", "note": "National Wealth Fund drawn down; about half of reserves frozen abroad", "worst": "Active conflict or war", "buffer": 4.0, "exposure": 0.1, "final": 6.841, "rank": 8, "amp": 0}, {"name": "Bangladesh", "region": "Asia", "bloc": "South", "blend": 6.597, "eff": 2.008, "off": 0.028, "home": 6.412, "bonus": 0.008, "usd": 26, "base_usd": 25, "stock": 1.0, "near": 0.0, "extnote": "Food stocks", "note": "Reserves rebuilt but low", "worst": "Physical climate risk (floods, heat, sea level)", "buffer": 2.0, "exposure": 0.0, "final": 6.499, "rank": 9, "amp": 0}, {"name": "South Africa", "region": "Africa", "bloc": "South", "blend": 6.558, "eff": 3.159, "off": 0.06, "home": 6.165, "bonus": 0.279, "usd": 103, "base_usd": 65, "stock": 0.0, "near": 150.0, "extnote": "Public Investment Corporation (GEPF)", "note": "Modest reserves; rising debt", "worst": "High crime", "buffer": 3.0, "exposure": 0.1, "final": 6.317, "rank": 10, "amp": 0}, {"name": "Turkey", "region": "Europe/Middle East", "bloc": "South", "blend": 6.075, "eff": 2.006, "off": 0.028, "home": 5.905, "bonus": 0.006, "usd": 172, "base_usd": 170, "stock": 2.0, "near": 0.0, "extnote": "Small oil stocks", "note": "Thin net reserves after years of drawdown", "worst": "Loose money / excessive debt creation", "buffer": 2.0, "exposure": 0.0, "final": 6.085, "rank": 11, "amp": 0}, {"name": "Philippines", "region": "Asia", "bloc": "South", "blend": 6.383, "eff": 4.064, "off": 0.085, "home": 5.84, "bonus": 0.064, "usd": 115, "base_usd": 105, "stock": 0.0, "near": 40.0, "extnote": "SSS and GSIS social security funds", "note": "About $105bn FX reserves", "worst": "Physical climate risk (floods, heat, sea level)", "buffer": 4.0, "exposure": 0.0, "final": 6.003, "rank": 12, "amp": 0}, {"name": "Argentina", "region": "South America", "bloc": "South", "blend": 5.589, "eff": 1.049, "off": 0.001, "home": 5.581, "bonus": 0.049, "usd": 59, "base_usd": 49, "stock": 0.0, "near": 40.0, "extnote": "FGS (ANSES) sustainability fund", "note": "Negative net reserves; IMF-dependent", "worst": "External fragility (foreign-currency debt, pegs, current-account deficit, IMF dependence)", "buffer": 1.0, "exposure": 0.0, "final": 5.779, "rank": 13, "amp": 0}, {"name": "Mexico", "region": "North America", "bloc": "South", "blend": 6.006, "eff": 3.84, "off": 0.079, "home": 5.532, "bonus": 0.0, "usd": 240, "base_usd": 240, "stock": 0.0, "near": 0.0, "extnote": "No strategic reserve; pension funds are private", "note": "Reserves plus IMF flexible credit line", "worst": "High crime", "buffer": 4.0, "exposure": 0.1, "final": 5.637, "rank": 14, "amp": 0}, {"name": "China", "region": "Asia", "bloc": "South", "blend": 6.511, "eff": 6.483, "off": 0.152, "home": 5.519, "bonus": 0.043, "usd": 4832, "base_usd": 4600, "stock": 132.0, "near": 400.0, "extnote": "State oil stockpiles and very large state grain reserves; National Social Security Fund", "note": "About $3tn FX reserves, mostly bonds; offset by heavy local-government debt", "worst": "Concentrated asset bubbles", "buffer": 7.0, "exposure": 0.2, "final": 5.628, "rank": 15, "amp": 1.0}, {"name": "Israel", "region": "Middle East", "bloc": "North", "blend": 6.006, "eff": 4.607, "off": 0.1, "home": 5.404, "bonus": 0.007, "usd": 231, "base_usd": 230, "stock": 1.0, "near": 0.0, "extnote": "Small fuel reserve", "note": "About $200bn+ FX reserves", "worst": "Active conflict or war", "buffer": 5.0, "exposure": 0.2, "final": 5.492, "rank": 16, "amp": 0}, {"name": "Brazil", "region": "South America", "bloc": "South", "blend": 5.453, "eff": 3.875, "off": 0.08, "home": 5.017, "bonus": 0.035, "usd": 375, "base_usd": 350, "stock": 0.0, "near": 100.0, "extnote": "FGTS workers' fund under state control", "note": "About $350bn FX reserves; high public debt limits fiscal room", "worst": "High crime", "buffer": 4.0, "exposure": 0.1, "final": 5.35, "rank": 17, "amp": 0}, {"name": "India", "region": "Asia", "bloc": "South", "blend": 5.744, "eff": 4.882, "off": 0.108, "home": 5.125, "bonus": 0.082, "usd": 803, "base_usd": 700, "stock": 28.0, "near": 300.0, "extnote": "39m-barrel SPR and FCI grain stocks; EPFO provident fund", "note": "About $650-700bn FX reserves", "worst": "Physical climate risk (floods, heat, sea level)", "buffer": 5.0, "exposure": 0.1, "final": 5.191, "rank": 18, "amp": 0}, {"name": "Saudi Arabia", "region": "Middle East", "bloc": "South", "blend": 5.772, "eff": 6.062, "off": 0.141, "home": 4.961, "bonus": 0.182, "usd": 1437, "base_usd": 1375, "stock": 0.0, "near": 250.0, "extnote": "GOSI social insurance fund", "note": "Central bank reserves plus PIF, but much of PIF is domestic and illiquid", "worst": "Climate transition risk (fossil-fuel & carbon-heavy dependence)", "buffer": 7.0, "exposure": 0.4, "final": 5.167, "rank": 19, "amp": 0}, {"name": "Italy", "region": "Europe", "bloc": "North", "blend": 5.317, "eff": 3.01, "off": 0.056, "home": 5.02, "bonus": 0.01, "usd": 306, "base_usd": 300, "stock": 6.0, "near": 0.0, "extnote": "OCSIT oil stocks", "note": "Large gold reserves but high debt; relies on the ECB backstop", "worst": "Debt & military spending vs growth", "buffer": 3.0, "exposure": 0.0, "final": 5.147, "rank": 20, "amp": 0}, {"name": "Vietnam", "region": "Asia", "bloc": "South", "blend": 5.2, "eff": 2.96, "off": 0.054, "home": 4.917, "bonus": 0.08, "usd": 97, "base_usd": 85, "stock": 2.0, "near": 40.0, "extnote": "Rice and oil reserves; Vietnam Social Security fund", "note": "Modest reserves; low public debt", "worst": "Physical climate risk (floods, heat, sea level)", "buffer": 3.0, "exposure": 0.1, "final": 5.132, "rank": 21, "amp": 0}, {"name": "Thailand", "region": "Asia", "bloc": "South", "blend": 5.542, "eff": 4.979, "off": 0.111, "home": 4.929, "bonus": 0.079, "usd": 273, "base_usd": 260, "stock": 3.0, "near": 40.0, "extnote": "Oil reserve; Government Pension Fund", "note": "FX reserves near 45% of GDP", "worst": "Political instability", "buffer": 5.0, "exposure": 0.05, "final": 5.102, "rank": 22, "amp": 0}, {"name": "Australia", "region": "Oceania", "bloc": "North", "blend": 5.142, "eff": 4.004, "off": 0.083, "home": 4.713, "bonus": 0.004, "usd": 227, "base_usd": 225, "stock": 2.0, "near": 0.0, "extnote": "Small fuel stocks; Future Fund already counted", "note": "Future Fund and moderate public debt; floating currency", "worst": "Concentrated asset bubbles", "buffer": 5.0, "exposure": 0.5, "final": 5.074, "rank": 23, "amp": 0}, {"name": "United Kingdom", "region": "Europe", "bloc": "North", "blend": 5.231, "eff": 3.008, "off": 0.056, "home": 4.939, "bonus": 0.008, "usd": 188, "base_usd": 180, "stock": 8.0, "near": 0.0, "extnote": "Compulsory oil stocks held by industry", "note": "No fund; high debt and gilt-market sensitivity", "worst": "Debt & military spending vs growth", "buffer": 3.0, "exposure": 0.0, "final": 5.028, "rank": 24, "amp": 0}, {"name": "United States", "region": "North America", "bloc": "North", "blend": 5.192, "eff": 5.004, "off": 0.111, "home": 4.614, "bonus": 0.004, "usd": 279, "base_usd": 250, "stock": 29.0, "near": 0.0, "extnote": "Strategic Petroleum Reserve ~410m barrels; Social Security trust fund is non-marketable, so not counted", "note": "No fund, but dollar reserve status lets it borrow in a crisis", "worst": "Debt & military spending vs growth", "buffer": 5.0, "exposure": 0.0, "final": 4.869, "rank": 25, "amp": 0}, {"name": "South Korea", "region": "Asia", "bloc": "North", "blend": 5.181, "eff": 4.804, "off": 0.106, "home": 4.633, "bonus": 0.404, "usd": 842, "base_usd": 610, "stock": 7.0, "near": 900.0, "extnote": "KNOC strategic oil reserve; National Pension Service", "note": "About $400bn FX reserves; moderate public debt", "worst": "Energy, food & medicine security", "buffer": 5.0, "exposure": 0.3, "final": 4.856, "rank": 26, "amp": 0}, {"name": "Indonesia", "region": "Asia", "bloc": "South", "blend": 4.9, "eff": 3.867, "off": 0.08, "home": 4.51, "bonus": 0.027, "usd": 172, "base_usd": 160, "stock": 2.0, "near": 40.0, "extnote": "Bulog rice stocks; BPJS social security funds", "note": "Adequate FX reserves; low debt", "worst": "Physical climate risk (floods, heat, sea level)", "buffer": 4.0, "exposure": 0.1, "final": 4.855, "rank": 27, "amp": 0}, {"name": "France", "region": "Europe", "bloc": "North", "blend": 4.958, "eff": 3.015, "off": 0.056, "home": 4.681, "bonus": 0.015, "usd": 284, "base_usd": 270, "stock": 8.0, "near": 22.0, "extnote": "SAGESS oil stocks; Fonds de réserve pour les retraites", "note": "No fund; high debt; relies on the ECB backstop", "worst": "Debt & military spending vs growth", "buffer": 3.0, "exposure": 0.0, "final": 4.814, "rank": 28, "amp": 0}, {"name": "Qatar", "region": "Middle East", "bloc": "South", "blend": 5.461, "eff": 7.618, "off": 0.184, "home": 4.457, "bonus": 0.018, "usd": 601, "base_usd": 600, "stock": 1.0, "near": 0.0, "extnote": "Food stockpile; QIA already counted", "note": "Qatar Investment Authority, roughly twice GDP", "worst": "Climate transition risk (fossil-fuel & carbon-heavy dependence)", "buffer": 10.0, "exposure": 0.6, "final": 4.779, "rank": 29, "amp": 0}, {"name": "Japan", "region": "Asia", "bloc": "North", "blend": 5.2, "eff": 5.636, "off": 0.129, "home": 4.53, "bonus": 0.356, "usd": 1709, "base_usd": 1250, "stock": 34.0, "near": 1700.0, "extnote": "About 470m barrels of oil stocks; GPIF public pension fund", "note": "About $1.2tn FX reserves and large net foreign assets; gross public debt very high", "worst": "Debt & military spending vs growth", "buffer": 6.0, "exposure": 0.3, "final": 4.724, "rank": 30, "amp": 0}, {"name": "Canada", "region": "North America", "bloc": "North", "blend": 4.967, "eff": 3.854, "off": 0.079, "home": 4.573, "bonus": 0.174, "usd": 245, "base_usd": 120, "stock": 0.0, "near": 500.0, "extnote": "No strategic oil reserve; Canada Pension Plan Investments", "note": "Moderate federal debt; pension funds are not government buffers", "worst": "Concentrated asset bubbles", "buffer": 4.0, "exposure": 0.2, "final": 4.703, "rank": 31, "amp": 0}, {"name": "Chile", "region": "South America", "bloc": "South", "blend": 4.503, "eff": 3.36, "off": 0.066, "home": 4.208, "bonus": 0.0, "usd": 65, "base_usd": 65, "stock": 0.0, "near": 0.0, "extnote": "Sovereign funds already counted; pensions are private", "note": "Sovereign stabilisation funds and moderate reserves", "worst": "Trade viability (weak = high score)", "buffer": 4.0, "exposure": 0.4, "final": 4.63, "rank": 32, "amp": 0}, {"name": "Taiwan", "region": "Asia", "bloc": "North", "blend": 5.025, "eff": 6.409, "off": 0.15, "home": 4.27, "bonus": 0.249, "usd": 658, "base_usd": 590, "stock": 6.0, "near": 250.0, "extnote": "Oil stocks (~90 days); public labour pension fund", "note": "About $590bn FX reserves, roughly 70% of GDP", "worst": "Energy, food & medicine security", "buffer": 7.0, "exposure": 0.3, "final": 4.592, "rank": 33, "amp": 0}, {"name": "United Arab Emirates", "region": "Middle East", "bloc": "South", "blend": 4.986, "eff": 6.84, "off": 0.162, "home": 4.177, "bonus": 0.0, "usd": 2100, "base_usd": 2100, "stock": 0.0, "near": 0.0, "extnote": "Sovereign funds already counted", "note": "ADIA, Mubadala and other funds well above GDP; large equity share", "worst": "Physical climate risk (floods, heat, sea level)", "buffer": 9.0, "exposure": 0.6, "final": 4.435, "rank": 34, "amp": 0}, {"name": "Poland", "region": "Europe", "bloc": "North", "blend": 4.6, "eff": 3.856, "off": 0.079, "home": 4.235, "bonus": 0.016, "usd": 254, "base_usd": 250, "stock": 3.0, "near": 5.0, "extnote": "Oil and gas stocks; Demographic Reserve Fund", "note": "Adequate reserves; widening deficit from defence", "worst": "AI disruption exposure (jobs and exports AI can substitute)", "buffer": 4.0, "exposure": 0.1, "final": 4.289, "rank": 35, "amp": 0}, {"name": "New Zealand", "region": "Oceania", "bloc": "North", "blend": 4.269, "eff": 3.36, "off": 0.066, "home": 3.99, "bonus": 0.0, "usd": 65, "base_usd": 65, "stock": 0.0, "near": 0.0, "extnote": "NZ Super Fund already counted", "note": "NZ Super Fund and low-moderate debt", "worst": "Concentrated asset bubbles", "buffer": 4.0, "exposure": 0.4, "final": 4.266, "rank": 36, "amp": 0}, {"name": "Netherlands", "region": "Europe", "bloc": "North", "blend": 4.531, "eff": 3.856, "off": 0.079, "home": 4.171, "bonus": 0.016, "usd": 85, "base_usd": 80, "stock": 5.0, "near": 0.0, "extnote": "COVA oil stocks; ABP is an occupational fund, not state", "note": "Low public debt gives fiscal room; pension assets are private", "worst": "Concentrated asset bubbles", "buffer": 4.0, "exposure": 0.1, "final": 4.265, "rank": 37, "amp": 0}, {"name": "Germany", "region": "Europe", "bloc": "North", "blend": 4.647, "eff": 5.775, "off": 0.133, "home": 4.031, "bonus": 0.015, "usd": 320, "base_usd": 300, "stock": 13.0, "near": 26.0, "extnote": "EBV oil stocks (~90 days); KENFO nuclear fund", "note": "Low debt and euro membership give fiscal space; little sovereign fund", "worst": "Energy, food & medicine security", "buffer": 6.0, "exposure": 0.1, "final": 4.184, "rank": 38, "amp": 0}, {"name": "Malaysia", "region": "Asia", "bloc": "South", "blend": 4.028, "eff": 4.14, "off": 0.087, "home": 3.677, "bonus": 0.46, "usd": 218, "base_usd": 150, "stock": 0.0, "near": 270.0, "extnote": "Employees Provident Fund", "note": "About $120bn reserves plus Khazanah", "worst": "Physical climate risk (floods, heat, sea level)", "buffer": 4.0, "exposure": 0.2, "final": 3.874, "rank": 39, "amp": 0}, {"name": "Singapore", "region": "Asia", "bloc": "North", "blend": 4.006, "eff": 6.847, "off": 0.162, "home": 3.355, "bonus": 0.007, "usd": 1481, "base_usd": 1480, "stock": 1.0, "near": 0.0, "extnote": "Rice stockpile; CPF is invested in government bonds, so not counted", "note": "GIC, Temasek and MAS reserves well above GDP; large equity share", "worst": "Energy, food & medicine security", "buffer": 9.0, "exposure": 0.6, "final": 3.5, "rank": 40, "amp": 0}, {"name": "Norway", "region": "Europe", "bloc": "North", "blend": 3.733, "eff": 7.168, "off": 0.171, "home": 3.094, "bonus": 0.048, "usd": 2478, "base_usd": 2470, "stock": 0.0, "near": 30.0, "extnote": "Government Pension Fund Norway (domestic)", "note": "Oil fund ~NOK 22.7tn ($2.39tn), roughly 4-5x GDP; 72% equities", "worst": "Climate transition risk (fossil-fuel & carbon-heavy dependence)", "buffer": 10.0, "exposure": 0.72, "final": 3.175, "rank": 41, "amp": 0}, {"name": "Switzerland", "region": "Europe", "bloc": "North", "blend": 3.589, "eff": 8.152, "off": 0.199, "home": 2.876, "bonus": 0.052, "usd": 915, "base_usd": 900, "stock": 4.0, "near": 45.0, "extnote": "Compulsory stocks of fuel, food and medicines; AHV/AVS compensation fund", "note": "Central-bank reserves above 100% of GDP, about a quarter in equities", "worst": "Private debt (household & corporate level and credit growth)", "buffer": 9.0, "exposure": 0.25, "final": 2.984, "rank": 42, "amp": 0}]};
+let DATA = ALL.off;
+const OUT = {'Erodes first': 'var(--erodes)', 'At risk': 'var(--risk)', 'Muddles through': 'var(--muddles)', 'Succeeds': 'var(--succeeds)'};
+const outlook = x => x >= 7 ? 'Erodes first' : x >= 5.5 ? 'At risk' : x >= 4 ? 'Muddles through' : 'Succeeds';
+const X0 = 2.5, X1 = 8.5, Y0 = 0, Y1 = 10, XS = 5.5, YS = 5;
+const QUADS = {
+  fort: {n: '02', cls: 'q-fort', title: 'Fortresses', head: 'Built to ride out a storm', test: d => d.blend < XS && d.eff >= YS,
+    plain: 'Problems at home are modest, and there is a deep pool of money to fall back on.',
+    analogy: 'Like a household with a steady income and healthy savings.',
+    why: 'A global shock would still hurt, but these countries can pay their way through it without lasting damage.',
+    watch: 'Even fortresses can crack. A cushion parked in stock markets shrinks in a crash, which is why the model trims that part by 40%.'},
+  crack: {n: '03', cls: 'q-crack', title: 'Cushioned but cracking', head: 'Wealthy, but the cracks are real', test: d => d.blend >= XS && d.eff >= YS,
+    plain: 'Serious problems are building at home, but there is enough money to buy time.',
+    analogy: 'Like a high earner with big savings who keeps running up debts.',
+    why: 'Money can delay trouble, not fix it. If the underlying problems go unaddressed, the cushion slowly gets spent.',
+    watch: 'Watch whether the cushion is used to fix the problems or to paper over them.'},
+  unins: {n: '04', cls: 'q-unins', title: 'Sound but uninsured', head: 'Sensible, but no safety net', test: d => d.blend < XS && d.eff < YS,
+    plain: 'Problems at home are manageable, but there is not much money set aside if something goes wrong.',
+    analogy: 'Like a careful household with no emergency fund.',
+    why: 'Fine in calm times. A shock from outside, such as a trade partner in trouble or a spike in energy prices, could hurt more than it should.',
+    watch: 'For these countries, trouble imported from trade partners matters a lot. It is often what tips them from "muddles through" into "at risk".'},
+  exposed: {n: '05', cls: 'q-exposed', title: 'Exposed', head: 'Under strain, with little to fall back on', test: d => d.blend >= XS && d.eff < YS,
+    plain: 'Serious problems at home and only a thin cushion.',
+    analogy: 'Like a household behind on its bills with no savings.',
+    why: 'These are the economies most likely to erode first. When a shock hits there is nothing to absorb it, so it goes straight to jobs, prices and living standards.',
+    watch: 'Help usually comes from outside (the IMF, allies, money sent home by workers abroad), which the model does not count as a cushion.'},
+};
+const usd = v => v >= 1000 ? '$' + (v / 1000).toFixed(v >= 10000 ? 0 : 1) + 'tn' : '$' + v + 'bn';
+const rOf = (v, scale) => Math.max(3.5, Math.sqrt(v) * scale);
+let filter = 'All';
+const NS = 'http://www.w3.org/2000/svg';
+const el = (n, a, p) => { const e = document.createElementNS(NS, n); for (const k in a) e.setAttribute(k, a[k]); if (p) p.appendChild(e); return e; };
+const html = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
+const shownData = () => DATA.filter(d => filter === 'All' || d.bloc === filter);
+const scaleFor = W => Math.min(W, 900) / 900 * 0.62;
+
+/* Build each quadrant section's text once; the facts and chips are refreshed on every redraw. */
+for (const sec of document.querySelectorAll('.story[data-q]')) {
+  const q = QUADS[sec.dataset.q];
+  const viz = html('div', 'viz'); const box = html('div', 'chartbox'); box.dataset.focus = sec.dataset.q;
+  const svg = el('svg', {role: 'img', 'aria-label': 'Map with the ' + q.title + ' group highlighted'}); box.appendChild(svg);
+  const tp = html('div', 'tip'); tp.hidden = true; box.appendChild(tp); const hn = html('div', 'hint', 'Countries in this group are highlighted.'); hn.appendChild(html('span', 'narrow', ' Swipe sideways to see the whole map.')); viz.append(box, hn);
+  const t = html('div', 'text');
+  t.append(html('div', 'num', q.n + ' · ' + q.title.toUpperCase()));
+  const h = html('h2', '', q.head); h.id = 'h-' + sec.dataset.q; t.appendChild(h);
+  t.append(html('span', 'tag ' + q.cls + '-t', q.title), html('p', 'big', q.plain), html('p', 'analogy', q.analogy), html('p', '', q.why));
+  const facts = html('div', 'facts'); facts.dataset.role = 'facts'; t.appendChild(facts);
+  const lab = html('div', 'eyebrow', 'Countries in this group'); const chips = html('ul', 'chips'); chips.dataset.role = 'chips';
+  t.append(lab, chips, html('p', 'm', q.watch));
+  sec.append(viz, t);
+}
+
+function drawChart(box) {
+  const focus = box.dataset.focus, q = QUADS[focus];
+  const svg = box.querySelector('svg');
+  while (svg.firstChild) svg.removeChild(svg.firstChild);
+  const W = Math.max(480, box.clientWidth), H = Math.round(Math.min(620, Math.max(380, W * 0.66)));
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  const m = {l: 44, r: 14, t: 14, b: 46};
+  const x = v => m.l + (v - X0) / (X1 - X0) * (W - m.l - m.r);
+  const y = v => H - m.b - (v - Y0) / (Y1 - Y0) * (H - m.t - m.b);
+  const scale = scaleFor(W);
+  const qs = [['fort', X0, XS, YS, Y1], ['crack', XS, X1, YS, Y1], ['unins', X0, XS, Y0, YS], ['exposed', XS, X1, Y0, YS]];
+  for (const [id, a, b, c, d] of qs) el('rect', {x: x(a), y: y(d), width: x(b) - x(a), height: y(c) - y(d), fill: 'var(--q-' + id + ')', opacity: q && id !== focus ? .3 : 1}, svg);
+  const g = el('g', {}, svg);
+  for (let v = 3; v <= 8; v++) el('line', {x1: x(v), x2: x(v), y1: y(Y0), y2: y(Y1), stroke: 'var(--grid)', 'stroke-width': 1}, g);
+  for (let v = 0; v <= 10; v += 2) el('line', {x1: x(X0), x2: x(X1), y1: y(v), y2: y(v), stroke: 'var(--grid)', 'stroke-width': 1}, g);
+  el('line', {x1: x(XS), x2: x(XS), y1: y(Y0), y2: y(Y1), stroke: 'var(--axis)', 'stroke-width': 1.5, 'stroke-dasharray': '5 4'}, g);
+  el('line', {x1: x(X0), x2: x(X1), y1: y(YS), y2: y(YS), stroke: 'var(--axis)', 'stroke-width': 1.5, 'stroke-dasharray': '5 4'}, g);
+  for (let v = 3; v <= 8; v++) { const t = el('text', {x: x(v), y: H - m.b + 17, 'text-anchor': 'middle', 'font-size': 11, fill: 'var(--muted)', 'font-family': 'var(--mono)'}, svg); t.textContent = v; }
+  for (let v = 0; v <= 10; v += 2) { const t = el('text', {x: m.l - 8, y: y(v) + 4, 'text-anchor': 'end', 'font-size': 11, fill: 'var(--muted)', 'font-family': 'var(--mono)'}, svg); t.textContent = v; }
+  const xl = el('text', {x: (x(X0) + x(X1)) / 2, y: H - 10, 'text-anchor': 'middle', 'font-size': 12, fill: 'var(--muted)'}, svg); xl.textContent = 'Problems at home  →  more serious';
+  const yl = el('text', {x: 12, y: (y(Y0) + y(Y1)) / 2, 'text-anchor': 'middle', 'font-size': 12, fill: 'var(--muted)', transform: `rotate(-90 12 ${(y(Y0) + y(Y1)) / 2})`}, svg); yl.textContent = 'Safety cushion  →  deeper';
+  const qt = [['fort', x(X0) + 10, y(Y1) + 20, 'start', 'Fortresses'], ['crack', x(X1) - 10, y(Y1) + 20, 'end', 'Cushioned but cracking'], ['unins', x(X0) + 10, y(Y0) - 10, 'start', 'Sound but uninsured'], ['exposed', x(X1) - 10, y(Y0) - 10, 'end', 'Exposed']];
+  for (const [id, a, b, an, tx] of qt) { const t = el('text', {x: a, y: b, 'text-anchor': an, 'font-size': 14.5, 'font-weight': 600, fill: 'var(--ink)', 'font-family': 'var(--display)', opacity: q && id !== focus ? .3 : .85}, svg); t.textContent = tx; }
+  const shown = shownData();
+  const inF = d => !q || q.test(d);
+  const order = [...shown].sort((a, b) => (inF(a) - inF(b)) || (b.usd - a.usd));
+  const bg = el('g', {}, svg), lg = el('g', {}, svg);
+  const circles = order.map(d => ({d, on: inF(d), cx: x(Math.min(X1, Math.max(X0, d.blend))), cy: y(d.eff), r: rOf(d.usd, scale)}));
+  for (const c of circles) {
+    const col = OUT[outlook(c.d.final)];
+    const ci = el('circle', {cx: c.cx, cy: c.cy, r: c.r, fill: c.on ? col : 'var(--axis)', 'fill-opacity': c.on ? .34 : .12, stroke: c.on ? col : 'var(--axis)', 'stroke-opacity': c.on ? 1 : .35, 'stroke-width': c.on ? 1.6 : 1, class: 'bub', tabindex: c.on ? 0 : -1, role: 'img', 'aria-label': `${c.d.name}: problems at home ${c.d.blend.toFixed(2)}, cushion ${c.d.eff.toFixed(1)}, ${usd(c.d.usd)}, ${outlook(c.d.final)}`}, bg);
+    ci.addEventListener('mousemove', e => tip(box, e, c.d)); ci.addEventListener('mouseleave', () => hide(box));
+    ci.addEventListener('click', () => tipAt(box, c.cx * box.querySelector('svg').clientWidth / W, (c.cy - c.r) * box.querySelector('svg').clientHeight / H, c.d));
+    ci.addEventListener('focus', () => tipAt(box, c.cx * svg.clientWidth / W, (c.cy - c.r) * svg.clientHeight / H, c.d)); ci.addEventListener('blur', () => hide(box));
+    if (c.on) el('circle', {cx: c.cx, cy: c.cy, r: 2, fill: col, 'pointer-events': 'none'}, bg);
+  }
+  // labels for highlighted countries only; try 12 positions, skip if all collide (still on hover)
+  const fs = 11.5, cw = 6.4, placed = [];
+  const live = circles.filter(c => c.on);
+  const hits = b => placed.some(p => b.x < p.x + p.w && b.x + b.w > p.x && b.y < p.y + p.h && b.y + b.h > p.y)
+    || live.some(c => { const nx = Math.max(b.x, Math.min(c.cx, b.x + b.w)), ny = Math.max(b.y, Math.min(c.cy, b.y + b.h)); return (nx - c.cx) ** 2 + (ny - c.cy) ** 2 < 4; });
+  for (const c of [...live].sort((a, b) => b.d.final - a.d.final || b.r - a.r)) {
+    const w = c.d.name.length * cw, h = fs + 2, gap = 3, d45 = c.r * 0.72 + gap;
+    const opts = [[c.cx + c.r + gap, c.cy - h / 2], [c.cx - c.r - gap - w, c.cy - h / 2], [c.cx - w / 2, c.cy - c.r - gap - h], [c.cx - w / 2, c.cy + c.r + gap],
+      [c.cx + d45, c.cy - d45 - h], [c.cx + d45, c.cy + d45], [c.cx - d45 - w, c.cy - d45 - h], [c.cx - d45 - w, c.cy + d45],
+      [c.cx + c.r + gap, c.cy - h - 2], [c.cx + c.r + gap, c.cy + 2], [c.cx - c.r - gap - w, c.cy - h - 2], [c.cx - c.r - gap - w, c.cy + 2]];
+    for (const [bx, by] of opts) {
+      const b = {x: bx, y: by, w, h};
+      if (bx < m.l || bx + w > W - m.r || by < m.t || by + h > H - m.b || hits(b)) continue;
+      placed.push(b);
+      const t = el('text', {x: bx, y: by + h - 3, 'font-size': fs, fill: 'var(--ink)', 'font-weight': q ? 500 : 400}, lg); t.textContent = c.d.name;
+      break;
+    }
+  }
+}
+
+function tip(box, e, d) { const r = box.getBoundingClientRect(); tipAt(box, e.clientX - r.left + box.scrollLeft, e.clientY - r.top, d); }
+function tipAt(box, px, py, d) {
+  const t = box.querySelector('.tip'); t.hidden = false; while (t.firstChild) t.removeChild(t.firstChild);
+  const h = document.createElement('div'); const b = document.createElement('b'); b.textContent = d.name; h.append(b, ' · #' + d.rank + ' of 42'); t.appendChild(h);
+  t.appendChild(html('div', 'm', outlook(d.final) + ' (final score ' + d.final.toFixed(2) + ')'));
+  const dl = document.createElement('dl');
+  const rowsT = [['Problems at home', d.blend.toFixed(2) + ' / 10'], ['Biggest single problem', d.worst.split(' (')[0]], ['Cushion strength', d.eff.toFixed(1) + ' / 10'], ['Cushion size', usd(d.usd)], ['Cushion lowers the score by', (d.off * 100).toFixed(1) + '%']];
+  if (DATA === ALL.on) rowsT.splice(4, 0, ['Stockpiles', usd(d.stock)], ['Pension funds (25% counted)', usd(d.near)], ['Extra cushion points', '+' + d.bonus.toFixed(2)]);
+  for (const [k, v] of rowsT) dl.append(html('dt', '', k), html('dd', '', v));
+  t.appendChild(dl);
+  const n = html('div', 'm', d.note + (DATA === ALL.on ? ' · ' + d.extnote : '')); n.style.marginTop = '6px'; t.appendChild(n);
+  const tw = t.offsetWidth, th = t.offsetHeight;
+  let lx = px + 14, ly = py + 14;
+  if (lx + tw > box.scrollLeft + box.clientWidth) lx = px - tw - 14;
+  if (ly + th > box.clientHeight) ly = py - th - 14;
+  t.style.left = Math.max(box.scrollLeft + 4, lx) + 'px'; t.style.top = Math.max(4, ly) + 'px';
+}
+function hide(box) { box.querySelector('.tip').hidden = true; }
+const hideAll = () => document.querySelectorAll('.chartbox').forEach(hide);
+
+function sizeKey() {
+  const s = document.querySelector('.sizeKey'); while (s.firstChild) s.removeChild(s.firstChild);
+  const scale = scaleFor(Math.max(480, document.querySelector('#s-all .chartbox').clientWidth));
+  const big = rOf(4000, scale), base = 2 * big + 4;
+  s.setAttribute('height', Math.ceil(base + 18));
+  let cx = 6;
+  for (const v of [100, 1000, 4000]) {
+    const r = rOf(v, scale), half = Math.max(r, 22); cx += half;
+    el('circle', {cx, cy: base - r, r, fill: 'none', stroke: 'var(--muted)', 'stroke-width': 1.2}, s);
+    const t = el('text', {x: cx, y: base + 14, 'text-anchor': 'middle', 'font-size': 11, fill: 'var(--muted)', 'font-family': 'var(--mono)'}, s); t.textContent = usd(v);
+    cx += half + 10;
+  }
+  s.setAttribute('width', Math.ceil(cx));
+}
+
+function fact(k, v, s) { const f = html('div', 'fact'); f.append(html('div', 'k', k), html('div', 'v', v)); if (s) f.appendChild(html('div', 's', s)); return f; }
+function fillText() {
+  const shown = shownData();
+  for (const sec of document.querySelectorAll('.story[data-q]')) {
+    const q = QUADS[sec.dataset.q];
+    const list = shown.filter(q.test).sort((a, b) => b.final - a.final);
+    const facts = sec.querySelector('[data-role=facts]'); facts.textContent = '';
+    const chips = sec.querySelector('[data-role=chips]'); chips.textContent = '';
+    facts.appendChild(fact('Countries here', String(list.length), filter === 'All' ? 'of 42' : 'in the ' + (filter === 'North' ? 'Global North' : 'Global South')));
+    if (list.length) {
+      const rich = [...list].sort((a, b) => b.usd - a.usd)[0];
+      const worst = [...list].sort((a, b) => b.blend - a.blend)[0];
+      const best = [...list].sort((a, b) => a.final - b.final)[0];
+      facts.appendChild(fact('Biggest cushion', rich.name, usd(rich.usd)));
+      facts.appendChild(fact('Most strain at home', worst.name, worst.blend.toFixed(2) + ' of 10'));
+      facts.appendChild(fact('Best final verdict', best.name, outlook(best.final) + ' · ' + best.final.toFixed(2)));
+    }
+    for (const d of list) { const li = document.createElement('li'); const i = document.createElement('i'); i.style.background = OUT[outlook(d.final)]; li.append(i, d.name); li.title = outlook(d.final) + ' · ' + d.final.toFixed(2) + ' · ' + usd(d.usd); chips.appendChild(li); }
+    if (!list.length) chips.appendChild(html('li', '', 'None in this view'));
+  }
+}
+
+function drawAll() { document.querySelectorAll('.chartbox').forEach(drawChart); sizeKey(); fillText(); }
+
+document.getElementById('ext').addEventListener('change', e => {
+  DATA = e.target.checked ? ALL.on : ALL.off;
+  document.querySelector('.sizeNote').textContent = e.target.checked ? 'Cushion: FX reserves and sovereign funds, plus strategic stockpiles and 25% of public pension funds.' : 'Cushion: FX reserves plus sovereign wealth funds.';
+  hideAll(); drawAll();
+});
+document.querySelectorAll('.seg button').forEach(b => b.addEventListener('click', () => {
+  filter = b.dataset.f; document.querySelectorAll('.seg button').forEach(x => x.setAttribute('aria-pressed', String(x === b))); hideAll(); drawAll();
+}));
+let rt, lastW = window.innerWidth; window.addEventListener('resize', () => { if (window.innerWidth === lastW) return; lastW = window.innerWidth; clearTimeout(rt); rt = setTimeout(drawAll, 120); });
+drawAll();
+</script>
